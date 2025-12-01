@@ -7,4 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "pyside6>=6.10.1",
     "sqlalchemy>=2.0.44",
+    "psycopg2-binary>=2.9.9",  # Driver PostgreSQL para Python
+    "python-dotenv>=1.0.0",    # Para gerenciar variáveis de ambiente
 ]

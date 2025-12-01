@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
     QHeaderView, QMessageBox, QComboBox, QPlainTextEdit,
     QAbstractItemView, QDialog, QStackedWidget, QFrame, QScrollArea,
-    QInputDialog, QDateEdit, QGroupBox, QGridLayout
+    QInputDialog, QDateEdit, QGroupBox, QGridLayout, QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer, QTime, QDate
 from PySide6.QtGui import QIcon, QGuiApplication, QColor, QFont
@@ -227,6 +227,17 @@ class TicketActionDialog(QDialog, CenterMixin):
         <b>Descrição:</b><br>
         <div style='background-color:#fff; padding:10px; border-radius:4px; border:1px solid #ddd; color: #333;'>{c.descricao}</div>
         """
+        
+        # Se for solicitação de criação de conta, mostrar sistemas solicitados
+        if c.maquina == "Solicitação de Criação de Conta" and c.contas_solicitadas:
+            info_text += f"""
+        <br><hr>
+        <b>Sistemas para Criação de Conta:</b><br>
+        <div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>
+        {c.contas_solicitadas.replace(',', '<br>')}
+        </div>
+        """
+        
         self.lbl_info.setText(info_text)
         while self.action_layout.count():
             child = self.action_layout.takeAt(0)
@@ -247,16 +258,44 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def build_finish_ui(self, chamado):
         lbl = QLabel(f"<b>Em atendimento desde:</b> {chamado.data_inicio_atendimento}")
-        self.txt_diag = QPlainTextEdit(); self.txt_diag.setPlaceholderText("Diagnóstico técnico..."); self.txt_diag.setStyleSheet("background-color: white; color: #333;")
-        self.txt_solucao = QPlainTextEdit(); self.txt_solucao.setPlaceholderText("Solução aplicada..."); self.txt_solucao.setStyleSheet("background-color: white; color: #333;")
-        btn_finish = QPushButton("Finalizar Chamado"); btn_finish.setObjectName("SubmitBtn"); btn_finish.clicked.connect(self.finalizar_atendimento)
-        self.action_layout.addWidget(lbl); self.action_layout.addWidget(QLabel("Diagnóstico:")); self.action_layout.addWidget(self.txt_diag)
-        self.action_layout.addWidget(QLabel("Solução:")); self.action_layout.addWidget(self.txt_solucao); self.action_layout.addWidget(btn_finish)
+        btn_finish = QPushButton("Finalizar Chamado")
+        btn_finish.setObjectName("SubmitBtn")
+        btn_finish.clicked.connect(self.finalizar_atendimento)
+        
+        self.action_layout.addWidget(lbl)
+        
+        # Verificar se é uma solicitação de criação de conta
+        if chamado.maquina == "Solicitação de Criação de Conta":
+            # Para criação de conta: mostrar apenas um campo com login e senha
+            self.action_layout.addWidget(QLabel("Credenciais Criadas:"))
+            self.txt_solucao = QPlainTextEdit()
+            self.txt_solucao.setPlaceholderText("Digite o login e senha separados por | (exemplo: usuario.nome | senha123)")
+            self.txt_solucao.setStyleSheet("background-color: white; color: #333;")
+            self.action_layout.addWidget(self.txt_solucao)
+        else:
+            # Para chamados normais: diagnóstico e solução
+            self.txt_diag = QPlainTextEdit()
+            self.txt_diag.setPlaceholderText("Diagnóstico técnico...")
+            self.txt_diag.setStyleSheet("background-color: white; color: #333;")
+            self.txt_solucao = QPlainTextEdit()
+            self.txt_solucao.setPlaceholderText("Solução aplicada...")
+            self.txt_solucao.setStyleSheet("background-color: white; color: #333;")
+            self.action_layout.addWidget(QLabel("Diagnóstico:"))
+            self.action_layout.addWidget(self.txt_diag)
+            self.action_layout.addWidget(QLabel("Solução:"))
+            self.action_layout.addWidget(self.txt_solucao)
+        
+        self.action_layout.addWidget(btn_finish)
 
 
     def build_readonly_ui(self, chamado):
-        info = f"<b>Responsável:</b> {chamado.nome_suporte}<br><b>Início:</b> {chamado.data_inicio_atendimento} | <b>Fim:</b> {chamado.data_fechamento}<br><br><b>Diagnóstico:</b> {chamado.diagnostico}<br><b>Solução:</b> {chamado.solucao}"
-        lbl = QLabel(info); lbl.setWordWrap(True)
+        # Verificar se é uma solicitação de conta
+        if chamado.maquina == "Solicitação de Criação de Conta":
+            info = f"<b>Responsável:</b> {chamado.nome_suporte}<br><b>Início:</b> {chamado.data_inicio_atendimento} | <b>Fim:</b> {chamado.data_fechamento}<br><br><b>Credenciais Criadas:</b><br><div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>{chamado.solucao}</div>"
+        else:
+            info = f"<b>Responsável:</b> {chamado.nome_suporte}<br><b>Início:</b> {chamado.data_inicio_atendimento} | <b>Fim:</b> {chamado.data_fechamento}<br><br><b>Diagnóstico:</b> {chamado.diagnostico}<br><b>Solução:</b> {chamado.solucao}"
+        lbl = QLabel(info)
+        lbl.setWordWrap(True)
         self.action_layout.addWidget(lbl)
 
     def iniciar_atendimento(self):
@@ -264,8 +303,18 @@ class TicketActionDialog(QDialog, CenterMixin):
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def finalizar_atendimento(self):
-        try: self.controller.finalizar_chamado(self.chamado_id, self.user_suporte.id, self.txt_diag.toPlainText(), self.txt_solucao.toPlainText()); QMessageBox.information(self, "Sucesso", "Chamado finalizado!"); self.accept()
-        except Exception as e: QMessageBox.warning(self, "Erro", str(e))
+        try:
+            c = self.controller.buscar_por_id(self.chamado_id)
+            if c.maquina == "Solicitação de Criação de Conta":
+                # Para contas, não precisa de diagnóstico
+                self.controller.finalizar_chamado(self.chamado_id, self.user_suporte.id, "", self.txt_solucao.toPlainText())
+            else:
+                # Para chamados normais
+                self.controller.finalizar_chamado(self.chamado_id, self.user_suporte.id, self.txt_diag.toPlainText(), self.txt_solucao.toPlainText())
+            QMessageBox.information(self, "Sucesso", "Chamado finalizado!")
+            self.accept()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
 
 # --- CADASTRO ---
 class RegisterWindow(QDialog, CenterMixin):
@@ -404,8 +453,43 @@ class UserWindow(QMainWindow):
 
         form_layout.addWidget(QLabel("Máquina / Dispositivo:"))
         self.combo_machine = QComboBox()
-        self.combo_machine.addItems(["COMPUTADOR","NOTEBOOK","IMPRESSORA","TELEFONE","INTERNET","SCANNER","Outro Dispositivo"])
+        self.combo_machine.addItems([
+            "COMPUTADOR",
+            "NOTEBOOK",
+            "IMPRESSORA",
+            "TELEFONE",
+            "INTERNET",
+            "SCANNER",
+            "Solicitação de Criação de Conta",  # NOVA OPÇÃO
+            "Outro Dispositivo"
+        ])
+        # Conectar mudança de seleção para mostrar/ocultar checkboxes
+        self.combo_machine.currentIndexChanged.connect(self.on_machine_changed)
         form_layout.addWidget(self.combo_machine)
+
+        # CONTAINER PARA OS CHECKBOXES DE CONTAS (INICIALMENTE OCULTO)
+        self.contas_container = QWidget()
+        self.contas_layout = QVBoxLayout(self.contas_container)
+        self.contas_layout.setSpacing(8)
+        
+        # Label do container
+        self.contas_label = QLabel("Selecione os sistemas que precisa de conta:")
+        self.contas_label.setStyleSheet("color: #2c3e50; font-weight: bold;")
+        
+        # Checkboxes de sistemas disponíveis
+        # Sistemas internos que podem ter contas criadas
+        self.checkboxes_contas = {}
+        sistemas = ["Email Corporativo", "SharePoint", "Confluence", "Jira", "GitHub", "VPN", "Servidor Interno"]
+        
+        for sistema in sistemas:
+            cb = QCheckBox(sistema)
+            cb.setStyleSheet("QCheckBox { color: #333; background-color: transparent; }")
+            self.checkboxes_contas[sistema] = cb
+            self.contas_layout.addWidget(cb)
+        
+        self.contas_container.setVisible(False)  # Inicialmente oculto
+        form_layout.addWidget(self.contas_label)
+        form_layout.addWidget(self.contas_container)
 
         form_layout.addWidget(QLabel("Descrição do Problema:"))
         self.txt_desc = QPlainTextEdit()
@@ -424,6 +508,17 @@ class UserWindow(QMainWindow):
         layout.addWidget(form_frame)
         layout.addStretch()
         return widget
+
+    def on_machine_changed(self):
+        """Mostra/oculta checkboxes de contas quando seleção muda"""
+        is_conta = self.combo_machine.currentText() == "Solicitação de Criação de Conta"
+        self.contas_label.setVisible(is_conta)
+        self.contas_container.setVisible(is_conta)
+        
+        # Se não é conta, limpar checkboxes
+        if not is_conta:
+            for cb in self.checkboxes_contas.values():
+                cb.setChecked(False)
 
     def create_my_tickets_page(self):
         widget = QWidget()
@@ -500,10 +595,32 @@ class UserWindow(QMainWindow):
 
     def criar_chamado(self):
         try:
-            self.controller.criar_chamado(self.user.id, self.txt_desc.toPlainText(), self.combo_machine.currentText())
+            maquina = self.combo_machine.currentText()
+            descricao = self.txt_desc.toPlainText()
+            
+            # Se for solicitação de conta, validar se selecionou ao menos uma
+            if maquina == "Solicitação de Criação de Conta":
+                contas_selecionadas = [sistema for sistema, cb in self.checkboxes_contas.items() if cb.isChecked()]
+                if not contas_selecionadas:
+                    QMessageBox.warning(self, "Erro", "Selecione pelo menos um sistema para criação de conta!")
+                    return
+                # Converter para string (separada por vírgula)
+                contas_str = ", ".join(contas_selecionadas)
+                # Passar contas_selecionadas para controller
+                self.controller.criar_chamado_com_contas(self.user.id, descricao, maquina, contas_str)
+            else:
+                # Chamado normal (sem contas)
+                self.controller.criar_chamado(self.user.id, descricao, maquina)
+            
             QMessageBox.information(self, "Sucesso", "Chamado registrado!")
-            self.txt_desc.clear(); self.combo_machine.setCurrentIndex(0); self.switch_page(1)
-        except Exception as e: QMessageBox.warning(self, "Erro", str(e))
+            self.txt_desc.clear()
+            self.combo_machine.setCurrentIndex(0)
+            # Limpar checkboxes
+            for cb in self.checkboxes_contas.values():
+                cb.setChecked(False)
+            self.switch_page(1)
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
 
     def deletar_chamado(self, chamado_id):
         confirm = QMessageBox.question(self, "Confirmar", "Excluir?", QMessageBox.Yes | QMessageBox.No)
