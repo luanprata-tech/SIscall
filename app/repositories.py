@@ -149,6 +149,35 @@ class ChamadoRepository:
         finally:
             session.close()
 
+    def criar_com_contas(self, usuario_id: int, descricao: str, maquina: str, contas_selecionadas: str):
+        """
+        Criar chamado para solicitação de criação de contas
+        
+        Args:
+            usuario_id: ID do usuário que fez a solicitação
+            descricao: Descrição/observações adicionais
+            maquina: Deve ser "Solicitação de Criação de Conta"
+            contas_selecionadas: String com sistemas selecionados (ex: "Email Corporativo, SharePoint, Jira")
+        """
+        session = self.session_factory()
+        try:
+            novo_chamado = Chamado(
+                usuario_id=usuario_id,
+                descricao=descricao,
+                maquina=maquina,
+                # Armazena as contas solicitadas
+                contas_solicitadas=contas_selecionadas,
+                data_abertura=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                status="Aberto"
+            )
+            session.add(novo_chamado)
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def assumir_atendimento(self, chamado_id: int, suporte_id: int):
         session = self.session_factory()
         try:

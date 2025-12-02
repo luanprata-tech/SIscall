@@ -3,7 +3,12 @@ import traceback
 import os
 
 # Define variável de ambiente para evitar segfaults em alguns Linux (Wayland)
-os.environ["QT_QPA_PLATFORM"] = "xcb"
+if sys.platform == "win32":
+    os.environ["QT_QPA_PLATFORM"] = "windows"
+elif sys.platform == "darwin":  # macOS
+    os.environ["QT_QPA_PLATFORM"] = "cocoa"
+elif sys.platform == "linux":
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 print(">>> Importando módulos...", flush=True)
 try:
@@ -26,7 +31,9 @@ class SistemaChamadosApp:
         # 1. Configuração do Banco
         print(">>> Configurando banco de dados...", flush=True)
         try:
-            self.db_manager = DatabaseManager("sqlite:///sistema_chamados.db")
+            # Sem passar connection_string, ele lerá de variáveis de ambiente
+            # Veja o arquivo .env na raiz do projeto para configurar
+            self.db_manager = DatabaseManager()
             self.db_manager.setup()
             print(">>> Banco configurado com sucesso.", flush=True)
         except Exception as e:

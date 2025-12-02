@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Arquivo .env com credenciais (NUNCA commitar!)
+.env
+
+# Banco de dados SQLite (se usar)
+*.db
+*.sqlite
+*.sqlite3

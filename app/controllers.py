@@ -78,6 +78,17 @@ class ChamadoController:
              raise ValueError("Selecione qual máquina está com problema.")
         self.repo.criar(usuario_id, descricao, maquina)
     
+    def criar_chamado_com_contas(self, usuario_id, descricao, maquina, contas_selecionadas):
+        """Criar chamado para solicitação de contas com sistemas selecionados"""
+        if not descricao.strip():
+            raise ValueError("Descrição não pode estar vazia.")
+        if maquina != "Solicitação de Criação de Conta":
+            raise ValueError("Este método é apenas para solicitações de contas.")
+        if not contas_selecionadas:
+            raise ValueError("Selecione pelo menos um sistema.")
+        # Passar contas_selecionadas para o repositório
+        self.repo.criar_com_contas(usuario_id, descricao, maquina, contas_selecionadas)
+    
     def excluir_chamado(self, chamado_id):
         chamado = self.repo.buscar_por_id(chamado_id)
         if not chamado: raise ValueError("Chamado não encontrado.")
@@ -93,9 +104,19 @@ class ChamadoController:
         self.repo.assumir_atendimento(chamado_id, suporte_id)
 
     def finalizar_chamado(self, chamado_id, suporte_id, diagnostico, solucao):
-        if not diagnostico.strip() or not solucao.strip():
-            raise ValueError("É obrigatório descrever o Diagnóstico e a Solução.")
+        # Buscar o chamado para verificar o tipo
         chamado = self.repo.buscar_por_id(chamado_id)
+        
+        # Validação diferente para solicitação de contas
+        if chamado.maquina == "Solicitação de Criação de Conta":
+            # Para contas, apenas solução (login/senha) é obrigatória
+            if not solucao.strip():
+                raise ValueError("É obrigatório informar as credenciais criadas.")
+        else:
+            # Para chamados normais, tanto diagnóstico quanto solução são obrigatórios
+            if not diagnostico.strip() or not solucao.strip():
+                raise ValueError("É obrigatório descrever o Diagnóstico e a Solução.")
+        
         if chamado.suporte_id != suporte_id:
              raise ValueError("Apenas o suporte responsável pode finalizar.")
         self.repo.finalizar_atendimento(chamado_id, diagnostico, solucao)
