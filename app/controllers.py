@@ -82,7 +82,7 @@ class ChamadoController:
         """Criar chamado para solicitação de contas com sistemas selecionados"""
         if not descricao.strip():
             raise ValueError("Descrição não pode estar vazia.")
-        if maquina != "Solicitação de Criação de Conta":
+        if maquina != "CRIAÇÃO DE CONTA":
             raise ValueError("Este método é apenas para solicitações de contas.")
         if not contas_selecionadas:
             raise ValueError("Selecione pelo menos um sistema.")
@@ -108,7 +108,7 @@ class ChamadoController:
         chamado = self.repo.buscar_por_id(chamado_id)
         
         # Validação diferente para solicitação de contas
-        if chamado.maquina == "Solicitação de Criação de Conta":
+        if chamado.maquina == "CRIAÇÃO DE CONTA":
             # Para contas, apenas solução (login/senha) é obrigatória
             if not solucao.strip():
                 raise ValueError("É obrigatório informar as credenciais criadas.")

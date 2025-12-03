@@ -229,7 +229,7 @@ class TicketActionDialog(QDialog, CenterMixin):
         """
         
         # Se for solicitação de criação de conta, mostrar sistemas solicitados
-        if c.maquina == "Solicitação de Criação de Conta" and c.contas_solicitadas:
+        if c.maquina == "CRIAÇÃO DE CONTA" and c.contas_solicitadas:
             info_text += f"""
         <br><hr>
         <b>Sistemas para Criação de Conta:</b><br>
@@ -265,7 +265,7 @@ class TicketActionDialog(QDialog, CenterMixin):
         self.action_layout.addWidget(lbl)
         
         # Verificar se é uma solicitação de criação de conta
-        if chamado.maquina == "Solicitação de Criação de Conta":
+        if chamado.maquina == "CRIAÇÃO DE CONTA":
             # Para criação de conta: mostrar apenas um campo com login e senha
             self.action_layout.addWidget(QLabel("Credenciais Criadas:"))
             self.txt_solucao = QPlainTextEdit()
@@ -290,7 +290,7 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def build_readonly_ui(self, chamado):
         # Verificar se é uma solicitação de conta
-        if chamado.maquina == "Solicitação de Criação de Conta":
+        if chamado.maquina == "CRIAÇÃO DE CONTA":
             info = f"<b>Responsável:</b> {chamado.nome_suporte}<br><b>Início:</b> {chamado.data_inicio_atendimento} | <b>Fim:</b> {chamado.data_fechamento}<br><br><b>Credenciais Criadas:</b><br><div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>{chamado.solucao}</div>"
         else:
             info = f"<b>Responsável:</b> {chamado.nome_suporte}<br><b>Início:</b> {chamado.data_inicio_atendimento} | <b>Fim:</b> {chamado.data_fechamento}<br><br><b>Diagnóstico:</b> {chamado.diagnostico}<br><b>Solução:</b> {chamado.solucao}"
@@ -305,7 +305,7 @@ class TicketActionDialog(QDialog, CenterMixin):
     def finalizar_atendimento(self):
         try:
             c = self.controller.buscar_por_id(self.chamado_id)
-            if c.maquina == "Solicitação de Criação de Conta":
+            if c.maquina == "CRIAÇÃO DE CONTA":
                 # Para contas, não precisa de diagnóstico
                 self.controller.finalizar_chamado(self.chamado_id, self.user_suporte.id, "", self.txt_solucao.toPlainText())
             else:
@@ -460,7 +460,7 @@ class UserWindow(QMainWindow):
             "TELEFONE",
             "INTERNET",
             "SCANNER",
-            "Solicitação de Criação de Conta",  # NOVA OPÇÃO
+            "CRIAÇÃO DE CONTA",  # NOVA OPÇÃO
             "Outro Dispositivo"
         ])
         # Conectar mudança de seleção para mostrar/ocultar checkboxes
@@ -479,7 +479,7 @@ class UserWindow(QMainWindow):
         # Checkboxes de sistemas disponíveis
         # Sistemas internos que podem ter contas criadas
         self.checkboxes_contas = {}
-        sistemas = ["Email Corporativo", "SharePoint", "Confluence", "Jira", "GitHub", "VPN", "Servidor Interno"]
+        sistemas = ["IGESP","EXPRESSO","REDE","SGI","SISGERI"]
         
         for sistema in sistemas:
             cb = QCheckBox(sistema)
@@ -493,7 +493,7 @@ class UserWindow(QMainWindow):
 
         form_layout.addWidget(QLabel("Descrição do Problema:"))
         self.txt_desc = QPlainTextEdit()
-        self.txt_desc.setPlaceholderText("Descreva detalhadamente o erro...")
+        self.txt_desc.setPlaceholderText("Descreva o motivo do chamado...")
         self.txt_desc.setMinimumHeight(150)
         self.txt_desc.setStyleSheet("border: 1px solid #ccc; background-color: white; color: #333;")
         form_layout.addWidget(self.txt_desc)
@@ -511,7 +511,7 @@ class UserWindow(QMainWindow):
 
     def on_machine_changed(self):
         """Mostra/oculta checkboxes de contas quando seleção muda"""
-        is_conta = self.combo_machine.currentText() == "Solicitação de Criação de Conta"
+        is_conta = self.combo_machine.currentText() == "CRIAÇÃO DE CONTA"
         self.contas_label.setVisible(is_conta)
         self.contas_container.setVisible(is_conta)
         
@@ -591,6 +591,13 @@ class UserWindow(QMainWindow):
                     btn_del.setFixedSize(80, 30)
                     btn_del.clicked.connect(lambda _, cid=c.id: self.deletar_chamado(cid))
                     cell = QWidget(); l = QHBoxLayout(cell); l.setContentsMargins(5,5,5,5); l.addWidget(btn_del); table.setCellWidget(i, 6, cell)
+                elif c.status == "Finalizado":
+                    # Mostrar botão "Detalhes" para chamados finalizados
+                    btn_details = QPushButton("Detalhes")
+                    btn_details.setObjectName("Info")
+                    btn_details.setFixedSize(80, 30)
+                    btn_details.clicked.connect(lambda _, cid=c.id: self.ver_detalhes_chamado(cid))
+                    cell = QWidget(); l = QHBoxLayout(cell); l.setContentsMargins(5,5,5,5); l.addWidget(btn_details); table.setCellWidget(i, 6, cell)
                 else: table.setCellWidget(i, 6, QWidget())
 
     def criar_chamado(self):
@@ -599,7 +606,7 @@ class UserWindow(QMainWindow):
             descricao = self.txt_desc.toPlainText()
             
             # Se for solicitação de conta, validar se selecionou ao menos uma
-            if maquina == "Solicitação de Criação de Conta":
+            if maquina == "CRIAÇÃO DE CONTA":
                 contas_selecionadas = [sistema for sistema, cb in self.checkboxes_contas.items() if cb.isChecked()]
                 if not contas_selecionadas:
                     QMessageBox.warning(self, "Erro", "Selecione pelo menos um sistema para criação de conta!")
@@ -627,6 +634,77 @@ class UserWindow(QMainWindow):
         if confirm == QMessageBox.Yes:
             try: self.controller.excluir_chamado(chamado_id); self.load_data()
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
+
+    def ver_detalhes_chamado(self, chamado_id):
+        """Mostra detalhes do chamado finalizado (especialmente credenciais de conta)"""
+        try:
+            chamado = self.controller.buscar_por_id(chamado_id)
+            if not chamado:
+                QMessageBox.warning(self, "Erro", "Chamado não encontrado!")
+                return
+            
+            # Criar dialog com detalhes
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Detalhes do Chamado #{chamado_id}")
+            dialog.setFixedSize(500, 400)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Scroll area para conteúdo
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll_content = QWidget()
+            scroll_layout = QVBoxLayout(scroll_content)
+            
+            # Mostrar apenas descrição do problema
+            lbl_desc_title = QLabel("<b>Problema:</b>")
+            scroll_layout.addWidget(lbl_desc_title)
+            lbl_desc = QLabel(chamado.descricao)
+            lbl_desc.setWordWrap(True)
+            lbl_desc.setStyleSheet("background-color:#f5f5f5; padding:10px; border-radius:4px;")
+            scroll_layout.addWidget(lbl_desc)
+            
+            # Mostrar resposta do admin diferente por tipo
+            if chamado.maquina == "CRIAÇÃO DE CONTA":
+                # Para criação de conta, mostrar sistemas e credenciais
+                if chamado.contas_solicitadas:
+                    scroll_layout.addWidget(QLabel("<b>Sistemas Solicitados:</b>"))
+                    lbl_contas = QLabel(chamado.contas_solicitadas.replace(", ", "<br>"))
+                    lbl_contas.setStyleSheet("background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6;")
+                    scroll_layout.addWidget(lbl_contas)
+                
+                if chamado.solucao:
+                    scroll_layout.addWidget(QLabel("<b>Credenciais Criadas:</b>"))
+                    lbl_credenciais = QLabel(chamado.solucao)
+                    lbl_credenciais.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffc107; font-weight: bold;")
+                    lbl_credenciais.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                    scroll_layout.addWidget(lbl_credenciais)
+            else:
+                # Para chamados normais, mostrar diagnóstico e solução
+                if chamado.diagnostico:
+                    scroll_layout.addWidget(QLabel("<b>Diagnóstico:</b>"))
+                    lbl_diag = QLabel(chamado.diagnostico)
+                    lbl_diag.setWordWrap(True)
+                    scroll_layout.addWidget(lbl_diag)
+                
+                if chamado.solucao:
+                    scroll_layout.addWidget(QLabel("<b>Solução:</b>"))
+                    lbl_sol = QLabel(chamado.solucao)
+                    lbl_sol.setWordWrap(True)
+                    scroll_layout.addWidget(lbl_sol)
+            
+            scroll_layout.addStretch()
+            scroll.setWidget(scroll_content)
+            layout.addWidget(scroll)
+            
+            # Botão fechar
+            btn_close = QPushButton("Fechar")
+            btn_close.clicked.connect(dialog.accept)
+            layout.addWidget(btn_close)
+            
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Erro ao abrir detalhes: {str(e)}")
 
 # --- ADMIN WINDOW (MAXIMIZADO + RELATÓRIOS + GESTÃO) ---
 class AdminWindow(QMainWindow): 
@@ -904,7 +982,15 @@ class AdminWindow(QMainWindow):
                     btn.setStyleSheet(f"background-color: {bg_hex}; color: {fg_hex}; {border_style} border-radius: 4px; font-weight: bold;")
                 
                 table.setCellWidget(i, 8, widget)
-            else: table.setItem(i, 8, QTableWidgetItem(c.nome_suporte or "-"))
+            else: 
+                # Mostrar botão "Detalhes" no histórico
+                btn_details = QPushButton("Detalhes")
+                btn_details.setObjectName("Info")
+                btn_details.setFixedSize(100, 36)
+                btn_details.clicked.connect(lambda _, cid=c.id: self.ver_detalhes_chamado_admin(cid))
+                
+                widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn_details)
+                table.setCellWidget(i, 8, widget)
         table.verticalScrollBar().setValue(v_scroll)
 
     def abrir_atendimento(self, chamado_id):
@@ -913,3 +999,114 @@ class AdminWindow(QMainWindow):
         dialog.exec()
         self.timer.start(1000)
         self.refresh_data()
+
+    def ver_detalhes_chamado_admin(self, chamado_id):
+        """Mostra detalhes completos do chamado para o administrador"""
+        try:
+            chamado = self.controller.buscar_por_id(chamado_id)
+            if not chamado:
+                QMessageBox.warning(self, "Erro", "Chamado não encontrado!")
+                return
+            
+            # Criar dialog com detalhes
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Detalhes do Chamado #{chamado_id}")
+            dialog.setFixedSize(600, 650)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Scroll area para conteúdo
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll_content = QWidget()
+            scroll_layout = QVBoxLayout(scroll_content)
+            
+            # ID e Máquina no topo
+            header_info = f"<h3 style='margin:0; color:#2c3e50;'>Chamado #{chamado.id} - {chamado.maquina}</h3>"
+            lbl_header = QLabel(header_info)
+            scroll_layout.addWidget(lbl_header)
+            scroll_layout.addSpacing(10)
+            
+            # Descrição
+            scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Descrição:</b>"))
+            lbl_desc = QLabel(chamado.descricao)
+            lbl_desc.setWordWrap(True)
+            lbl_desc.setStyleSheet("background-color:#f5f5f5; padding:10px; border-radius:4px; border:1px solid #ddd;")
+            scroll_layout.addWidget(lbl_desc)
+            scroll_layout.addSpacing(15)
+            
+            # Card de Datas e Horários
+            dates_card = QFrame()
+            dates_card.setStyleSheet("background-color: white; border: 1px solid #ddd; border-radius: 4px; padding: 10px;")
+            dates_layout = QVBoxLayout(dates_card)
+            dates_layout.setSpacing(8)
+            
+            dates_layout.addWidget(QLabel("<b style='color: #2c3e50;'>Linhas do Tempo:</b>"))
+            
+            # Função para formatar data/hora
+            def format_datetime(dt_str):
+                try:
+                    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                    return dt.strftime("%d/%m/%Y às %H:%M:%S")
+                except:
+                    return dt_str if dt_str else "-"
+            
+            # Abertura
+            data_abertura = format_datetime(chamado.data_abertura)
+            dates_layout.addWidget(QLabel(f"<b>📅 Aberto:</b> {data_abertura}"))
+            
+            # Início de atendimento
+            if chamado.data_inicio_atendimento:
+                data_inicio = format_datetime(chamado.data_inicio_atendimento)
+                dates_layout.addWidget(QLabel(f"<b>⏱️ Atendimento Iniciado:</b> {data_inicio}"))
+            
+            # Fechamento
+            if chamado.data_fechamento:
+                data_fechamento = format_datetime(chamado.data_fechamento)
+                dates_layout.addWidget(QLabel(f"<b>✓ Finalizado:</b> {data_fechamento}"))
+            
+            scroll_layout.addWidget(dates_card)
+            scroll_layout.addSpacing(15)
+            
+            # Sistemas solicitados (para criação de conta)
+            if chamado.maquina == "CRIAÇÃO DE CONTA" and chamado.contas_solicitadas:
+                scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Sistemas Solicitados:</b>"))
+                lbl_contas = QLabel(chamado.contas_solicitadas.replace(", ", "<br>"))
+                lbl_contas.setStyleSheet("background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6;")
+                scroll_layout.addWidget(lbl_contas)
+                scroll_layout.addSpacing(15)
+            
+            # Diagnóstico (se houver)
+            if chamado.diagnostico:
+                scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Diagnóstico:</b>"))
+                lbl_diag = QLabel(chamado.diagnostico)
+                lbl_diag.setWordWrap(True)
+                lbl_diag.setStyleSheet("background-color:#f0f8ff; padding:10px; border-radius:4px; border:1px solid #87ceeb;")
+                scroll_layout.addWidget(lbl_diag)
+                scroll_layout.addSpacing(15)
+            
+            # Solução/Credenciais (se houver)
+            if chamado.solucao:
+                if chamado.maquina == "CRIAÇÃO DE CONTA":
+                    scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Credenciais Criadas:</b>"))
+                else:
+                    scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Solução Aplicada:</b>"))
+                
+                lbl_sol = QLabel(chamado.solucao)
+                lbl_sol.setWordWrap(True)
+                lbl_sol.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffc107;")
+                lbl_sol.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                scroll_layout.addWidget(lbl_sol)
+            
+            scroll_layout.addStretch()
+            scroll.setWidget(scroll_content)
+            layout.addWidget(scroll)
+            
+            # Botão fechar
+            btn_close = QPushButton("Fechar")
+            btn_close.clicked.connect(dialog.accept)
+            layout.addWidget(btn_close)
+            
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Erro ao abrir detalhes: {str(e)}")
