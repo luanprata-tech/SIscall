@@ -1,0 +1,101 @@
+/* ARQUIVO: style.qss */
+
+/* --- RESET GLOBAL (Ignora o tema do Windows) --- */
+QWidget {
+    color: #333333;
+    font-family: "Segoe UI";
+    /* Não definimos font-size aqui para evitar o bug do -1 */
+}
+
+/* Menu Lateral */
+QWidget#Sidebar { background-color: #2c3e50; min-width: 220px; max-width: 220px; }
+QPushButton#MenuBtn { background-color: transparent; color: #ecf0f1; text-align: left; padding: 12px 20px; border: none; font-size: 15px; }
+QPushButton#MenuBtn:hover { background-color: #34495e; border-left: 4px solid #4CAF50; }
+QPushButton#MenuBtn:checked { background-color: #34495e; border-left: 4px solid #4CAF50; font-weight: bold; }
+QLabel#MenuTitle { color: white; font-size: 20px; font-weight: bold; padding: 30px 10px; }
+
+QMainWindow, QDialog {
+    background-color: #f0f3f4;
+}
+
+/* Garante que áreas de scroll tenham fundo transparente ou igual à janela */
+QScrollArea, QStackedWidget {
+    background-color: transparent;
+    border: none;
+}
+
+/* --- FORMULÁRIOS (Força fundo branco para não ficar cinza no Windows) --- */
+QLineEdit, QPlainTextEdit, QTextEdit, QDateEdit, QComboBox {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    padding: 5px;
+    selection-background-color: #454de0ff;
+}
+
+QLineEdit:focus, QPlainTextEdit:focus {
+    border: 1px solid #454de0ff;
+}
+
+/* --- TABELAS --- */
+QTableWidget {
+    background-color: #ffffff;
+    gridline-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    border-radius: 10px;
+}
+QHeaderView::section {
+    background-color: #e0e0e0;
+    padding: 4px;
+    border: 1px solid #bdc3c7;
+    font-weight: bold;
+}
+QTableWidget::item:hover {
+    background-color: #e6e6e6;
+    color: #333333; 
+}
+
+QTableWidget::item:selected {
+    background-color: #bdbdbd; /* Cinza médio (em vez do azul) */
+    color: #000000;            /* Texto preto para destaque */
+}
+
+/* --- BOTÕES GERAIS --- */
+QPushButton { 
+    background-color: #458BD2; 
+    color: white; 
+    border-radius: 4px; 
+    padding: 8px 16px; 
+    font-weight: bold; 
+    border: none;
+}
+QPushButton:hover { background-color: #537DA7; }
+QPushButton:pressed { background-color: #3468a0; }
+QPushButton:disabled { background-color: #bdc3c7; color: #7f8c8d; }
+
+/* Botões Específicos (IDs) */
+QPushButton#Danger { background-color: #d32f2f; }
+QPushButton#Danger:hover { background-color: #b71c1c; }
+
+QPushButton#Info { background-color: #2196F3; } 
+QPushButton#Secondary { background-color: #757575; }
+
+/* --- CORREÇÃO DO QMESSAGEBOX --- */
+QMessageBox {
+    background-color: #f0f3f4;
+}
+QMessageBox QLabel {
+    color: #333333;
+}
+/* Força estilo nos botões do MessageBox */
+QMessageBox QPushButton {
+    background-color: #458BD2;
+    color: white;
+    border-radius: 4px;
+    padding: 6px 20px;
+    min-width: 80px;
+}
+QMessageBox QPushButton:hover {
+    background-color: #537DA7;
+}

@@ -1,0 +1,2 @@
+uv run python -m nuitka --standalone --enable-plugin=pyside6  --include-package=pg8000 --windows-console-mode=disable --mingw64 --include-data-file=style.qss=style.qss --output-dir=build main.py
+
