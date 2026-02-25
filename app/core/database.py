@@ -42,6 +42,15 @@ class DatabaseManager:
                 connection_string = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
                 print(f"✓ Conectando ao PostgreSQL: {db_user}@{db_host}:{db_port}/{db_name}")
             
+            elif db_engine == "mysql":
+                db_user = os.getenv("DB_USER")
+                db_password = os.getenv("DB_PASSWORD")
+                db_host = os.getenv("DB_HOST")
+                db_port = os.getenv("DB_PORT", "3306")
+                db_name = os.getenv("DB_NAME")
+                # String de conexão para MySQL usando pymysql
+                connection_string = f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
             elif db_engine == "sqlite":
                 # Para SQLite local (desenvolvimento)
                 db_path = os.getenv("DB_PATH", "sistema_chamados.db")

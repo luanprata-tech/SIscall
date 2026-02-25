@@ -9,4 +9,5 @@ dependencies = [
     "sqlalchemy>=2.0.44",
     "psycopg2-binary>=2.9.9",  # Driver PostgreSQL para Python
     "python-dotenv>=1.0.0",    # Para gerenciar variáveis de ambiente
+    "pymysql>=1.1.2",
 ]
