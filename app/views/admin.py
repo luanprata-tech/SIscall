@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QComboBox
 )
 from PySide6.QtCore import Qt, QTimer, QDate
-from PySide6.QtGui import QIcon, QFont, QColor
+from PySide6.QtGui import QFont, QColor
 from datetime import datetime
 from .dialogs import TicketActionDialog, UserEditDialog, UserRegisterDialog, AccountRequestActionDialog
 
@@ -47,13 +47,13 @@ class AdminWindow(QMainWindow):
         lbl_brand.setObjectName("MenuTitle")
         lbl_brand.setAlignment(Qt.AlignCenter)
         
-        self.btn_work = QPushButton("Tarefas"); self.btn_work.setObjectName("MenuBtn"); self.btn_work.setIcon(QIcon.fromTheme("view-list")); self.btn_work.setCheckable(True); self.btn_work.setChecked(True); self.btn_work.clicked.connect(lambda: self.switch_page(0))
-        self.btn_all = QPushButton("Histórico"); self.btn_all.setObjectName("MenuBtn"); self.btn_all.setIcon(QIcon.fromTheme("x-office-spreadsheet")); self.btn_all.setCheckable(True); self.btn_all.clicked.connect(lambda: self.switch_page(1))
+        self.btn_work = QPushButton("Tarefas"); self.btn_work.setObjectName("MenuBtn"); self.btn_work.setCheckable(True); self.btn_work.setChecked(True); self.btn_work.clicked.connect(lambda: self.switch_page(0))
+        self.btn_all = QPushButton("Histórico"); self.btn_all.setObjectName("MenuBtn"); self.btn_all.setCheckable(True); self.btn_all.clicked.connect(lambda: self.switch_page(1))
         
         self.btn_accounts = QPushButton("Solicitações de Conta"); self.btn_accounts.setObjectName("MenuBtn"); self.btn_accounts.setCheckable(True); self.btn_accounts.clicked.connect(lambda: self.switch_page(2))
 
         self.btn_reports = QPushButton("Relatórios"); self.btn_reports.setObjectName("MenuBtn"); self.btn_reports.setCheckable(True); self.btn_reports.clicked.connect(lambda: self.switch_page(3))
-        self.btn_config = QPushButton("Configurações"); self.btn_config.setObjectName("MenuBtn"); self.btn_config.setIcon(QIcon.fromTheme("preferences-system")); self.btn_config.setCheckable(True); self.btn_config.clicked.connect(lambda: self.switch_page(4))
+        self.btn_config = QPushButton("Configurações"); self.btn_config.setObjectName("MenuBtn"); self.btn_config.setCheckable(True); self.btn_config.clicked.connect(lambda: self.switch_page(4))
         btn_logout = QPushButton("Sair"); btn_logout.setObjectName("MenuBtn"); btn_logout.setStyleSheet("color: #ff6b6b;"); btn_logout.clicked.connect(self.logout_callback)
 
         sidebar_layout.addWidget(lbl_brand); sidebar_layout.addSpacing(20); sidebar_layout.addWidget(self.btn_work); sidebar_layout.addWidget(self.btn_all); sidebar_layout.addWidget(self.btn_accounts); sidebar_layout.addWidget(self.btn_reports); sidebar_layout.addWidget(self.btn_config); sidebar_layout.addStretch(); sidebar_layout.addWidget(btn_logout)
@@ -93,7 +93,7 @@ class AdminWindow(QMainWindow):
         table.setColumnWidth(4, 90)
         table.setColumnWidth(5, 90)
         table.setColumnWidth(7, 150) 
-        table.setColumnWidth(8, 200)
+        table.setColumnWidth(8, 230)
         table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
         
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -122,7 +122,7 @@ class AdminWindow(QMainWindow):
         table.setColumnWidth(4, 90)
         table.setColumnWidth(5, 90)
         table.setColumnWidth(6, 150)
-        table.setColumnWidth(7, 200)
+        table.setColumnWidth(7, 230)
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         
 
@@ -192,7 +192,6 @@ class AdminWindow(QMainWindow):
         self.combo_filter_setor.currentTextChanged.connect(self.load_users)
         
         btn_new_user = QPushButton("Novo Usuário")
-        btn_new_user.setIcon(QIcon.fromTheme("contact-new"))
         btn_new_user.clicked.connect(self.abrir_cadastro_usuario)
         
         filter_layout.addWidget(self.txt_search_user); filter_layout.addWidget(self.combo_filter_setor); filter_layout.addWidget(btn_new_user)
@@ -317,7 +316,7 @@ class AdminWindow(QMainWindow):
             table.setItem(i, 7, status_item)
             
             if edit_mode:
-                btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para caber textos longos
+                btn = QPushButton(); btn.setFixedHeight(36) # Altura fixa, largura dinâmica
                 is_mine = (c.suporte_id == self.user.id)
                 is_locked = (c.status == "Em andamento" and not is_mine)
                 if c.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
@@ -374,7 +373,7 @@ class AdminWindow(QMainWindow):
             else: status_item.setForeground(QColor("#F57C00"))
             table.setItem(i, 6, status_item)
 
-            btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para consistência e textos longos
+            btn = QPushButton(); btn.setFixedHeight(36) # Altura fixa, largura dinâmica
             is_mine = (s.suporte_id == self.user.id)
             is_locked = (s.status == "Em andamento" and not is_mine)
             if s.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)

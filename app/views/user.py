@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QMessageBox, QDialog, QScrollArea, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QFont, QColor
+from PySide6.QtGui import QFont, QColor
 from datetime import datetime
 
 # --- USUÁRIO COMUM ---
@@ -42,23 +42,19 @@ class UserWindow(QMainWindow):
         
         self.btn_new_ticket = QPushButton("Novo Chamado")
         self.btn_new_ticket.setObjectName("MenuBtn")
-        self.btn_new_ticket.setIcon(QIcon.fromTheme("list-add"))
         self.btn_new_ticket.setCheckable(True)
         self.btn_new_ticket.clicked.connect(lambda: self.switch_page(0))
 
         self.btn_my_tickets = QPushButton("Meus Chamados")
         self.btn_my_tickets.setObjectName("MenuBtn")
-        self.btn_my_tickets.setIcon(QIcon.fromTheme("folder-documents"))
         self.btn_my_tickets.setCheckable(True)
         self.btn_my_tickets.clicked.connect(lambda: self.switch_page(1))
 
         if self.user.tipo == 2:
             self.btn_register = QPushButton("Cadastrar Usuário")
             self.btn_register.setObjectName("MenuBtn")
-            self.btn_register.setIcon(QIcon.fromTheme("contact-new"))
             self.btn_register.setCheckable(True)
             self.btn_register.clicked.connect(lambda: self.switch_page(2))
-            sidebar_layout.addWidget(self.btn_register)
 
         btn_logout = QPushButton("Sair")
         btn_logout.setObjectName("MenuBtn")
@@ -69,6 +65,10 @@ class UserWindow(QMainWindow):
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(self.btn_new_ticket)
         sidebar_layout.addWidget(self.btn_my_tickets)
+
+        if self.user.tipo == 2:
+            sidebar_layout.addWidget(self.btn_register)
+
         sidebar_layout.addStretch()
         sidebar_layout.addWidget(btn_logout)
 
@@ -174,7 +174,7 @@ class UserWindow(QMainWindow):
         self.table.setColumnWidth(2, 90)
         self.table.setColumnWidth(3, 200)
         self.table.setColumnWidth(5, 120) 
-        self.table.setColumnWidth(6, 180) # Aumentado para caber o botão de confirmação
+        self.table.setColumnWidth(6, 230) # Aumentado para caber o botão de confirmação
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -285,18 +285,18 @@ class UserWindow(QMainWindow):
 
                 if c.status == "Aberto":
                     btn_del = QPushButton("Excluir"); btn_del.setObjectName("Danger")
-                    btn_del.setFixedSize(80, 30)
+                    btn_del.setFixedHeight(36)
                     btn_del.clicked.connect(lambda _, cid=c.id: self.deletar_chamado(cid))
                     layout.addWidget(btn_del)
                 elif c.status == "Resolvido":
                     btn_confirm = QPushButton("Confirmar e Fechar"); btn_confirm.setObjectName("SubmitBtn") 
-                    btn_confirm.setFixedSize(160, 30) # Aumentado para caber o texto
+                    btn_confirm.setFixedHeight(40) # Altura aumentada para evitar corte de texto
                     btn_confirm.clicked.connect(lambda _, cid=c.id: self.confirmar_fechamento(cid))
                     layout.addWidget(btn_confirm)
                 elif c.status == "Finalizado":
                     btn_details = QPushButton("Detalhes")
                     btn_details.setObjectName("Info")
-                    btn_details.setFixedSize(80, 30)
+                    btn_details.setFixedHeight(36)
                     btn_details.clicked.connect(lambda _, cid=c.id: self.ver_detalhes_chamado(cid))
                     layout.addWidget(btn_details)
                 

@@ -1,11 +1,12 @@
 import os
+import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from datetime import datetime
 
 class DashboardWindow(QMainWindow):
@@ -17,6 +18,7 @@ class DashboardWindow(QMainWindow):
         self.setStyleSheet("background-color: #2c3e50;") # Tema escuro para a TV
 
         self.known_ticket_ids = set()
+        self._first_run = True
 
         self.setup_ui()
         self.setup_sound()
@@ -81,23 +83,17 @@ class DashboardWindow(QMainWindow):
         layout.addWidget(self.table)
 
     def setup_sound(self):
-        self.sound_effect = QSoundEffect()
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        
         # Constrói o caminho para a pasta 'assets' na raiz do projeto
-        sound_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'notification.ogg')) # Usando .ogg para compatibilidade
+        sound_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'notification.wav')) # Usando .wav
         if os.path.exists(sound_path):
-            self.sound_effect.setSource(QUrl.fromLocalFile(sound_path))
-            self.sound_effect.setVolume(0.8)
-
-            # --- DIAGNÓSTICO ADICIONADO ---
-            # Verifica se o som foi carregado. Se o status não for 'Ready', é um problema de backend.
-            if self.sound_effect.status() != QSoundEffect.Ready:
-                print("***************************************************************************")
-                print("AVISO: O arquivo de som foi encontrado, mas não pôde ser carregado.")
-                print("Isto geralmente indica a falta de um backend de multimídia no Linux.")
-                print("Tente instalar o GStreamer com: sudo apt-get install gstreamer1.0-plugins-good")
-                print("***************************************************************************")
+            self.player.setSource(QUrl.fromLocalFile(sound_path))
+            self.audio_output.setVolume(1.0)
         else:
-            print(f"AVISO: Arquivo de som 'notification.ogg' não encontrado em '{sound_path}'")
+            print(f"AVISO: Arquivo de som 'notification.wav' não encontrado em '{sound_path}'")
 
     def refresh_data(self):
         try:
@@ -105,10 +101,13 @@ class DashboardWindow(QMainWindow):
             current_ticket_ids = {c.id for c in chamados}
 
             # Verifica se há novos chamados desde a última atualização
-            if self.known_ticket_ids and (new_tickets := current_ticket_ids - self.known_ticket_ids):
-                print(f"Novos chamados detectados: {new_tickets}")
-                self.sound_effect.play()
+            new_tickets = current_ticket_ids - self.known_ticket_ids
+            if not self._first_run and new_tickets:
+                if self.player.playbackState() == QMediaPlayer.PlayingState:
+                    self.player.stop()
+                self.player.play()
 
+            self._first_run = False
             self.known_ticket_ids = current_ticket_ids
             self.preencher_tabela(chamados)
         except Exception as e:

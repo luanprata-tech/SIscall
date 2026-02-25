@@ -2,7 +2,25 @@ import sys
 import traceback
 import os
 
-# Define variável de ambiente para evitar segfaults em alguns Linux (Wayland)
+# --- INÍCIO DA CORREÇÃO PARA PLUGINS DE MÍDIA ---
+# Adicionado para resolver problema de plugins (como áudio) no Windows
+# Define explicitamente o caminho dos plugins do Qt para o ambiente.
+try:
+    # O método preferencial e mais robusto
+    from PySide6.QtCore import QLibraryInfo
+    plugin_path = QLibraryInfo.path(QLibraryInfo.PluginsPath)
+    os.environ['QT_PLUGIN_PATH'] = plugin_path
+except ImportError:
+    # Um método de fallback caso o de cima falhe
+    try:
+        import PySide6
+        plugin_path = os.path.join(os.path.dirname(PySide6.__file__), "plugins")
+        if os.path.isdir(plugin_path):
+            os.environ['QT_PLUGIN_PATH'] = plugin_path
+    except Exception as e:
+        print(f"AVISO: Falha ao tentar configurar o QT_PLUGIN_PATH: {e}")
+# --- FIM DA CORREÇÃO ---
+
 if sys.platform == "win32":
     os.environ["QT_QPA_PLATFORM"] = "windows"
 elif sys.platform == "darwin":  # macOS
