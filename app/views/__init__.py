@@ -8,6 +8,7 @@ from .auth import ChangePasswordDialog, LoginWindow
 from .dialogs import UserEditDialog, TicketActionDialog, UserRegisterDialog, AccountRequestActionDialog
 from .user import UserWindow
 from .admin import AdminWindow
+from .dashboard import DashboardWindow
 
 __all__ = [
     "STYLESHEET",
@@ -19,5 +20,6 @@ __all__ = [
     "AccountRequestActionDialog",
     "TicketActionDialog",
     "UserWindow",
-    "AdminWindow"
+    "AdminWindow",
+    "DashboardWindow"
 ]
