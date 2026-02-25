@@ -14,9 +14,9 @@ print(">>> Importando módulos...", flush=True)
 try:
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer  
-    from app.database import DatabaseManager
-    from app.repositories import UsuarioRepository, ChamadoRepository
-    from app.controllers import AuthController, ChamadoController
+    from app.core.database import DatabaseManager
+    from app.repositories import UsuarioRepository, ChamadoRepository, SolicitacaoContaRepository
+    from app.controllers import AuthController, ChamadoController, SolicitacaoContaController
     from app.views import LoginWindow, UserWindow, AdminWindow, STYLESHEET
 except ImportError as e:
     print(f"ERRO DE IMPORTAÇÃO: {e}")
@@ -45,9 +45,11 @@ class SistemaChamadosApp:
         session_factory = self.db_manager.get_session
         user_repo = UsuarioRepository(session_factory)
         chamado_repo = ChamadoRepository(session_factory)
+        solicitacao_repo = SolicitacaoContaRepository(session_factory)
         
         self.auth_controller = AuthController(user_repo)
         self.chamado_controller = ChamadoController(chamado_repo)
+        self.solicitacao_controller = SolicitacaoContaController(solicitacao_repo)
 
         # 3. Janela Atual
         self.current_window = None
@@ -73,11 +75,12 @@ class SistemaChamadosApp:
             if user.tipo == 1:
                 # Admin
                 new_window = AdminWindow(user, self.chamado_controller, self.logout)
-                # INJEÇÃO DE DEPENDÊNCIA EXTRA PARA ADMIN
+                # INJEÇÃO DE DEPENDÊNCIAS EXTRAS PARA ADMIN
                 new_window.set_auth_controller(self.auth_controller)
+                new_window.set_solicitacao_controller(self.solicitacao_controller)
             else:
                 # Comum
-                new_window = UserWindow(user, self.chamado_controller, self.logout)
+                new_window = UserWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.logout)
             
             new_window.show()
             

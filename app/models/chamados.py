@@ -1,0 +1,39 @@
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy.orm import relationship
+from app.models.base import Base
+
+class Chamado(Base):
+    __tablename__ = 'chamados'
+    
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
+    suporte_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
+    
+    data_abertura = Column(String)
+    data_inicio_atendimento = Column(String, nullable=True)
+    data_fechamento = Column(String, nullable=True)
+    
+    descricao = Column(String)
+    maquina = Column(String, nullable=True)
+    
+    status = Column(String, default="Aberto")
+    diagnostico = Column(String, nullable=True)
+    
+    # Quando é solicitação de conta, este campo armazena login e senha
+    # Exemplo: "admin.user | senha123456"
+    solucao = Column(String, nullable=True)
+
+    usuario = relationship("Usuario", foreign_keys=[usuario_id], back_populates="chamados_abertos")
+    suporte = relationship("Usuario", foreign_keys=[suporte_id], back_populates="chamados_atendidos")
+    
+    @property
+    def nome_usuario(self):
+        return self.usuario.nome if self.usuario else "Desconhecido"
+    
+    @property
+    def setor_usuario(self):
+        return self.usuario.setor if self.usuario and self.usuario.setor else "N/A"
+        
+    @property
+    def nome_suporte(self):
+        return self.suporte.nome if self.suporte else None

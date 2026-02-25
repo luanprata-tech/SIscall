@@ -1,70 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship, scoped_session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
 import hashlib
 import os
 from dotenv import load_dotenv
+from app.models import Base, Usuario
 
 # Carregar variáveis de ambiente do arquivo .env
 # Este arquivo deve estar na raiz do projeto com credenciais do PostgreSQL
 load_dotenv()
-
-Base = declarative_base()
-
-class Usuario(Base):
-    __tablename__ = 'usuarios'
-    
-    id = Column(Integer, primary_key=True)
-    nome = Column(String, nullable=False)
-    login = Column(String, unique=True, nullable=False)
-    senha = Column(String, nullable=False)
-    tipo = Column(Integer, nullable=False)  # 0 = Comum, 1 = Admin
-    setor = Column(String, nullable=True)
-    
-    # Flag para forçar troca de senha no próximo login
-    trocar_senha = Column(Boolean, default=False) 
-
-    chamados_abertos = relationship("Chamado", foreign_keys="[Chamado.usuario_id]", back_populates="usuario")
-    chamados_atendidos = relationship("Chamado", foreign_keys="[Chamado.suporte_id]", back_populates="suporte")
-
-class Chamado(Base):
-    __tablename__ = 'chamados'
-    
-    id = Column(Integer, primary_key=True)
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
-    suporte_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
-    
-    data_abertura = Column(String)
-    data_inicio_atendimento = Column(String, nullable=True)
-    data_fechamento = Column(String, nullable=True)
-    
-    descricao = Column(String)
-    maquina = Column(String, nullable=True)
-    
-    # Campo para armazenar contas selecionadas (JSON string: "email,sharepoint,confluence,...")
-    # Usado quando maquina == "Solicitação de Criação de Conta"
-    contas_solicitadas = Column(String, nullable=True)
-    
-    status = Column(String, default="Aberto")
-    diagnostico = Column(String, nullable=True)
-    
-    # Quando é solicitação de conta, este campo armazena login e senha
-    # Exemplo: "admin.user | senha123456"
-    solucao = Column(String, nullable=True)
-
-    usuario = relationship("Usuario", foreign_keys=[usuario_id], back_populates="chamados_abertos")
-    suporte = relationship("Usuario", foreign_keys=[suporte_id], back_populates="chamados_atendidos")
-    
-    @property
-    def nome_usuario(self):
-        return self.usuario.nome if self.usuario else "Desconhecido"
-    
-    @property
-    def setor_usuario(self):
-        return self.usuario.setor if self.usuario and self.usuario.setor else "N/A"
-        
-    @property
-    def nome_suporte(self):
-        return self.suporte.nome if self.suporte else None
 
 class DatabaseManager:
     def __init__(self, connection_string=None):
