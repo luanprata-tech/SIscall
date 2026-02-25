@@ -7,6 +7,9 @@ class ChamadoController:
         self.repo = repo
 
     def criar_chamado(self, usuario_id, descricao, maquina):
+        if self.repo.possui_chamado_ativo(usuario_id):
+            raise ValueError("Você já possui um chamado em aberto ou em andamento. Aguarde a finalização para abrir um novo.")
+
         if not descricao.strip():
             raise ValueError("Descrição não pode estar vazia.")
         if not maquina or maquina == "Selecione a Máquina":
@@ -27,17 +30,28 @@ class ChamadoController:
             raise ValueError(f"Este chamado já está sendo atendido por {chamado.nome_suporte}.")
         self.repo.assumir_atendimento(chamado_id, suporte_id)
 
-    def finalizar_chamado(self, chamado_id, suporte_id, diagnostico, solucao):
-        # Buscar o chamado para verificar o tipo
+    def resolver_chamado(self, chamado_id, suporte_id, diagnostico, solucao):
         chamado = self.repo.buscar_por_id(chamado_id)
         
         if not diagnostico.strip() or not solucao.strip():
             raise ValueError("É obrigatório descrever o Diagnóstico e a Solução.")
         
         if chamado.suporte_id != suporte_id:
-             raise ValueError("Apenas o suporte responsável pode finalizar.")
+             raise ValueError("Apenas o suporte responsável pode resolver o chamado.")
         self.repo.finalizar_atendimento(chamado_id, diagnostico, solucao)
     
+    def fechar_chamado_pelo_usuario(self, chamado_id: int, usuario_id: int):
+        """Usuário confirma a resolução e fecha o chamado."""
+        chamado = self.repo.buscar_por_id(chamado_id)
+        if not chamado:
+            raise ValueError("Chamado não encontrado.")
+        if chamado.usuario_id != usuario_id:
+            raise ValueError("Apenas o autor do chamado pode fechá-lo.")
+        if chamado.status != 'Resolvido':
+            raise ValueError("Este chamado não pode ser fechado pois não foi resolvido pelo suporte.")
+        
+        self.repo.fechar_chamado(chamado_id)
+
     def buscar_por_id(self, chamado_id):
         return self.repo.buscar_por_id(chamado_id)
 

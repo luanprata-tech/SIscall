@@ -311,18 +311,20 @@ class AdminWindow(QMainWindow):
             status_item = QTableWidgetItem(c.status); status_item.setTextAlignment(Qt.AlignCenter)
             font = QFont(); font.setBold(True); status_item.setFont(font)
             if c.status == "Aberto": status_item.setForeground(QColor("#d32f2f"))
+            elif c.status == "Resolvido": status_item.setForeground(QColor("#2196F3"))
             elif c.status == "Finalizado": status_item.setForeground(QColor("#2E7D32"))
             else: status_item.setForeground(QColor("#F57C00"))
             table.setItem(i, 7, status_item)
             
             if edit_mode:
-                btn = QPushButton(); btn.setFixedSize(130, 36)
+                btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para caber textos longos
                 is_mine = (c.suporte_id == self.user.id)
                 is_locked = (c.status == "Em andamento" and not is_mine)
                 if c.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
                 elif is_locked: btn.setText("Bloqueado"); btn.setEnabled(False)
+                elif c.status == "Resolvido": btn.setText("Aguardando Usuário"); btn.setEnabled(False)
                 else: btn.setText("Continuar"); btn.setObjectName("SubmitBtn"); btn.setEnabled(True)
-                if not is_locked: btn.clicked.connect(lambda _, cid=c.id: self.abrir_atendimento(cid))
+                if not is_locked and c.status != 'Resolvido': btn.clicked.connect(lambda _, cid=c.id: self.abrir_atendimento(cid))
                 
                 widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn)
                 if bg_color:
@@ -372,7 +374,7 @@ class AdminWindow(QMainWindow):
             else: status_item.setForeground(QColor("#F57C00"))
             table.setItem(i, 6, status_item)
 
-            btn = QPushButton(); btn.setFixedSize(130, 36)
+            btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para consistência e textos longos
             is_mine = (s.suporte_id == self.user.id)
             is_locked = (s.status == "Em andamento" and not is_mine)
             if s.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)

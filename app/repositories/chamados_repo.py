@@ -11,6 +11,18 @@ class ChamadoRepository:
     def __init__(self, session_factory):
         self.session_factory = session_factory
 
+    def possui_chamado_ativo(self, usuario_id: int) -> bool:
+        """Verifica se o usuário já tem um chamado com status diferente de 'Finalizado'."""
+        session = self.session_factory()
+        try:
+            count = session.query(Chamado).filter(
+                Chamado.usuario_id == usuario_id,
+                Chamado.status != 'Finalizado'
+            ).count()
+            return count > 0
+        finally:
+            session.close()
+
     def criar(self, usuario_id: int, descricao: str, maquina: str):
         session = self.session_factory()
         try:
@@ -49,10 +61,24 @@ class ChamadoRepository:
         try:
             chamado = session.query(Chamado).get(chamado_id)
             if chamado:
-                chamado.status = "Finalizado"
-                chamado.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                chamado.status = "Resolvido"
                 chamado.diagnostico = diagnostico
                 chamado.solucao = solucao
+                session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def fechar_chamado(self, chamado_id: int):
+        """Fecha o chamado, chamado pelo usuário."""
+        session = self.session_factory()
+        try:
+            chamado = session.query(Chamado).get(chamado_id)
+            if chamado and chamado.status == 'Resolvido':
+                chamado.status = 'Finalizado'
+                chamado.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 session.commit()
         except:
             session.rollback()

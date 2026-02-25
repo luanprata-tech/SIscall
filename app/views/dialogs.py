@@ -295,9 +295,9 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def build_finish_ui(self, chamado):
         lbl = QLabel(f"<b>Em atendimento desde:</b> {chamado.data_inicio_atendimento}")
-        btn_finish = QPushButton("Finalizar Chamado")
+        btn_finish = QPushButton("Marcar como Resolvido")
         btn_finish.setObjectName("SubmitBtn")
-        btn_finish.clicked.connect(self.finalizar_atendimento)
+        btn_finish.clicked.connect(self.resolver_atendimento)
         
         self.action_layout.addWidget(lbl)
         
@@ -330,10 +330,10 @@ class TicketActionDialog(QDialog, CenterMixin):
             self.load_chamado()
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
-    def finalizar_atendimento(self):
+    def resolver_atendimento(self):
         try:
-            self.controller.finalizar_chamado(self.chamado_id, self.user_suporte.id, self.txt_diag.toPlainText(), self.txt_solucao.toPlainText())
-            QMessageBox.information(self, "Sucesso", "Chamado finalizado!")
+            self.controller.resolver_chamado(self.chamado_id, self.user_suporte.id, self.txt_diag.toPlainText(), self.txt_solucao.toPlainText())
+            QMessageBox.information(self, "Sucesso", "Chamado marcado como resolvido! Aguardando confirmação do usuário.")
             self.accept()
         except Exception as e:
             QMessageBox.warning(self, "Erro", str(e))

@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QComboBox, QCheckBox, 
-    QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView, 
+    QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMessageBox, QDialog, QScrollArea, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer
@@ -173,8 +173,8 @@ class UserWindow(QMainWindow):
         self.table.setColumnWidth(1, 90) 
         self.table.setColumnWidth(2, 90)
         self.table.setColumnWidth(3, 200)
-        self.table.setColumnWidth(5, 120)
-        self.table.setColumnWidth(6, 150)
+        self.table.setColumnWidth(5, 120) 
+        self.table.setColumnWidth(6, 180) # Aumentado para caber o botão de confirmação
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -272,23 +272,35 @@ class UserWindow(QMainWindow):
             font = QFont(); font.setBold(True); status_item.setFont(font)
             
             if c.status == "Aberto": status_item.setForeground(QColor("#d32f2f"))
+            elif c.status == "Resolvido": status_item.setForeground(QColor("#2196F3"))
             elif c.status == "Finalizado": status_item.setForeground(QColor("#2E7D32"))
             else: status_item.setForeground(QColor("#F57C00"))
             table.setItem(i, 5, status_item)
             
             if not is_admin:
+                cell_widget = QWidget()
+                layout = QHBoxLayout(cell_widget)
+                layout.setContentsMargins(5,5,5,5)
+                layout.setAlignment(Qt.AlignCenter)
+
                 if c.status == "Aberto":
                     btn_del = QPushButton("Excluir"); btn_del.setObjectName("Danger")
                     btn_del.setFixedSize(80, 30)
                     btn_del.clicked.connect(lambda _, cid=c.id: self.deletar_chamado(cid))
-                    cell = QWidget(); l = QHBoxLayout(cell); l.setContentsMargins(5,5,5,5); l.addWidget(btn_del); table.setCellWidget(i, 6, cell)
+                    layout.addWidget(btn_del)
+                elif c.status == "Resolvido":
+                    btn_confirm = QPushButton("Confirmar e Fechar"); btn_confirm.setObjectName("SubmitBtn") 
+                    btn_confirm.setFixedSize(160, 30) # Aumentado para caber o texto
+                    btn_confirm.clicked.connect(lambda _, cid=c.id: self.confirmar_fechamento(cid))
+                    layout.addWidget(btn_confirm)
                 elif c.status == "Finalizado":
                     btn_details = QPushButton("Detalhes")
                     btn_details.setObjectName("Info")
                     btn_details.setFixedSize(80, 30)
                     btn_details.clicked.connect(lambda _, cid=c.id: self.ver_detalhes_chamado(cid))
-                    cell = QWidget(); l = QHBoxLayout(cell); l.setContentsMargins(5,5,5,5); l.addWidget(btn_details); table.setCellWidget(i, 6, cell)
-                else: table.setCellWidget(i, 6, QWidget())
+                    layout.addWidget(btn_details)
+                
+                table.setCellWidget(i, 6, cell_widget)
 
     def criar_chamado(self):
         try:
@@ -318,6 +330,18 @@ class UserWindow(QMainWindow):
         if confirm == QMessageBox.Yes:
             try: self.controller.excluir_chamado(chamado_id); self.load_data()
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
+
+    def confirmar_fechamento(self, chamado_id):
+        confirm = QMessageBox.question(self, "Confirmar Resolução", 
+                                       "Você confirma que o problema foi resolvido? Esta ação fechará o chamado permanentemente.",
+                                       QMessageBox.Yes | QMessageBox.No)
+        if confirm == QMessageBox.Yes:
+            try:
+                self.controller.fechar_chamado_pelo_usuario(chamado_id, self.user.id)
+                QMessageBox.information(self, "Sucesso", "Chamado fechado com sucesso!")
+                self.load_data()
+            except Exception as e:
+                QMessageBox.warning(self, "Erro", str(e))
 
     def ver_detalhes_chamado(self, chamado_id):
         try:
