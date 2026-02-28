@@ -1,10 +1,12 @@
 # views/dialogs.py
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QComboBox, QPushButton, 
-    QLineEdit, QMessageBox, QScrollArea, QWidget, QFrame, QPlainTextEdit
+    QLineEdit, QMessageBox, QScrollArea, QWidget, QFrame, QPlainTextEdit,
+    QGridLayout
 )
 from PySide6.QtCore import Qt
 from .common import CenterMixin
+import json
 
 # --- DIALOGO DE EDIÇÃO DE USUÁRIO (ADMIN) ---
 class UserEditDialog(QDialog, CenterMixin):
@@ -133,15 +135,17 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         self.controller = controller
         self.solicitacao_id = solicitacao_id
         self.user_suporte = user_suporte
-        self.setWindowTitle(f"Atendimento Solicitação de Conta #{solicitacao_id}")
+        self.credential_inputs = {}
+        self.setWindowTitle(f"Atendimento Solicitação de Acesso #{solicitacao_id}")
         self.setStyleSheet("background-color: #fdfdfd; color: #333333;")
         self.setup_ui()
         self.load_solicitacao()
 
     def setup_ui(self):
         s = self.controller.buscar_por_id(self.solicitacao_id)
-        if s.status == "Aberto": self.setFixedSize(600,500)
-        else: self.setFixedSize(600,700)
+        if s.status == "Em andamento": self.setFixedSize(600, 700)
+        elif s.status == "Aberto": self.setFixedSize(600,500)
+        else: self.setFixedSize(600, 700)
         self.layout = QVBoxLayout(self)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setStyleSheet("background-color: #fdfdfd; border: none;") 
         scroll_content = QWidget(); scroll_content.setStyleSheet("background-color: #fdfdfd;")
@@ -190,16 +194,34 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         self.action_layout.addWidget(lbl); self.action_layout.addWidget(btn_start)
 
     def build_finish_ui(self, solicitacao):
+        self.credential_inputs.clear()
         lbl = QLabel(f"<b>Em atendimento desde:</b> {solicitacao.data_inicio_atendimento}")
+        self.action_layout.addWidget(lbl)
+        self.action_layout.addWidget(QLabel("<b>Preencha as credenciais para cada sistema:</b>"))
+
+        cred_scroll = QScrollArea()
+        cred_scroll.setWidgetResizable(True)
+        cred_scroll.setStyleSheet("background-color: #C4CFED; border: none;")
+        cred_widget = QWidget()
+        cred_layout = QGridLayout(cred_widget)
+        cred_layout.setSpacing(10)
+
+        sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip()]
+        
+        for i, sistema in enumerate(sistemas):
+            label = QLabel(f"{sistema}:")
+            line_edit = QLineEdit()
+            line_edit.setPlaceholderText(f"Login | Senha para {sistema}")
+            line_edit.setStyleSheet("background-color: white; color: #333;")
+            self.credential_inputs[sistema] = line_edit
+            cred_layout.addWidget(label, i, 0)
+            cred_layout.addWidget(line_edit, i, 1)
+        
+        cred_scroll.setWidget(cred_widget)
+        self.action_layout.addWidget(cred_scroll)
+
         btn_finish = QPushButton("Finalizar Solicitação"); btn_finish.setObjectName("SubmitBtn")
         btn_finish.clicked.connect(self.finalizar_atendimento)
-        
-        self.action_layout.addWidget(lbl)
-        self.action_layout.addWidget(QLabel("Credenciais Criadas:"))
-        self.txt_credenciais = QPlainTextEdit()
-        self.txt_credenciais.setPlaceholderText("Digite o login e senha separados por | (exemplo: usuario.nome | senha123)")
-        self.txt_credenciais.setStyleSheet("background-color: white; color: #333;")
-        self.action_layout.addWidget(self.txt_credenciais)
         self.action_layout.addWidget(btn_finish)
 
     def build_locked_ui(self, solicitacao):
@@ -207,8 +229,19 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         self.action_layout.addWidget(lbl)
 
     def build_readonly_ui(self, solicitacao):
-        info = f"<b>Responsável:</b> {solicitacao.nome_suporte}<br><b>Início:</b> {solicitacao.data_inicio_atendimento} | <b>Fim:</b> {solicitacao.data_fechamento}<br><br><b>Credenciais Criadas:</b><br><div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>{solicitacao.credenciais_criadas}</div>"
-        lbl = QLabel(info); lbl.setWordWrap(True)
+        info = f"<b>Responsável:</b> {solicitacao.nome_suporte}<br><b>Início:</b> {solicitacao.data_inicio_atendimento} | <b>Fim:</b> {solicitacao.data_fechamento}<br><br>"
+        
+        credenciais_html = "<b>Credenciais Criadas:</b><br><div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>"
+        try:
+            credenciais_data = json.loads(solicitacao.credenciais_criadas)
+            for sistema, cred in credenciais_data.items():
+                credenciais_html += f"<b>{sistema}:</b> {cred}<br>"
+        except (json.JSONDecodeError, TypeError):
+            credenciais_html += solicitacao.credenciais_criadas if solicitacao.credenciais_criadas else "N/A"
+        credenciais_html += "</div>"
+        
+        info += credenciais_html
+        lbl = QLabel(info); lbl.setWordWrap(True); lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.action_layout.addWidget(lbl)
 
     def iniciar_atendimento(self):
@@ -220,7 +253,14 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def finalizar_atendimento(self):
         try:
-            self.controller.finalizar_solicitacao(self.solicitacao_id, self.user_suporte.id, self.txt_credenciais.toPlainText())
+            credentials_data = {sistema: line_edit.text() for sistema, line_edit in self.credential_inputs.items()}
+            
+            if not all(credentials_data.values()):
+                QMessageBox.warning(self, "Atenção", "Por favor, preencha as credenciais para todos os sistemas solicitados.")
+                return
+
+            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4)
+            self.controller.finalizar_solicitacao(self.solicitacao_id, self.user_suporte.id, json_data)
             QMessageBox.information(self, "Sucesso", "Solicitação finalizada!")
             self.accept()
         except Exception as e:

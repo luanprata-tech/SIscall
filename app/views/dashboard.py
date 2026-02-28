@@ -62,18 +62,17 @@ class DashboardWindow(QMainWindow):
             }
         """)
         self.table.setAlternatingRowColors(False)
-        cols = ["ID", "Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status"]
+        cols = ["Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status"]
         self.table.setColumnCount(len(cols))
         self.table.setHorizontalHeaderLabels(cols)
 
-        self.table.setColumnWidth(0, 60)
+        self.table.setColumnWidth(0, 200)
         self.table.setColumnWidth(1, 200)
-        self.table.setColumnWidth(2, 200)
-        self.table.setColumnWidth(3, 150)
-        self.table.setColumnWidth(4, 100)
-        self.table.setColumnWidth(5, 120)
-        self.table.setColumnWidth(7, 150)
-        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+        self.table.setColumnWidth(2, 150)
+        self.table.setColumnWidth(3, 100)
+        self.table.setColumnWidth(4, 120)
+        self.table.setColumnWidth(6, 150)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
 
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
@@ -125,7 +124,6 @@ class DashboardWindow(QMainWindow):
             is_new = dt_obj and (agora - dt_obj).total_seconds() < 15
 
             items = [
-                QTableWidgetItem(str(c.id)),
                 QTableWidgetItem(c.setor_usuario),
                 QTableWidgetItem(c.nome_usuario),
                 QTableWidgetItem(c.maquina or "N/A"),
@@ -142,7 +140,7 @@ class DashboardWindow(QMainWindow):
 
             for col, item in enumerate(items):
                 item.setTextAlignment(Qt.AlignCenter)
-                if col == 6: item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                if col == 5: item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                 
                 # Aplica o destaque de cor para novos chamados
                 if is_new:

@@ -20,6 +20,18 @@ QPushButton#Info { background-color: #2196F3; }
 QPushButton#Secondary { background-color: #757575; }
 QPushButton#Link { background-color: transparent; color: #537DA7; border: none; text-decoration: underline;}
 
+/* Badge de contagem */
+QLabel#CountBadge {
+    background-color: #d32f2f;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    min-width: 20px;
+    max-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+}
+
 /* Botão de Submit (Verde Grande) */
 QPushButton#SubmitBtn { 
     background-color: #458BD2; color: white; border: none;
@@ -28,11 +40,22 @@ QPushButton#SubmitBtn {
 QPushButton#SubmitBtn:hover { background-color: #537DA7; }
 
 /* Menu Lateral */
-QWidget#Sidebar { background-color: #2c3e50; min-width: 220px; max-width: 220px; }
+QWidget#Sidebar { background-color: #2c3e50; min-width: 250px; max-width: 250px; }
 QPushButton#MenuBtn { background-color: transparent; color: #ecf0f1; text-align: left; padding: 12px 20px; border: none; font-size: 15px; }
 QPushButton#MenuBtn:hover { background-color: #34495e; border-left: 4px solid #4CAF50; }
 QPushButton#MenuBtn:checked { background-color: #34495e; border-left: 4px solid #4CAF50; font-weight: bold; }
 QLabel#MenuTitle { color: white; font-size: 20px; font-weight: bold; padding: 30px 10px; }
+
+/* Estilo para o texto (QLabel) dentro de um botão de menu com badge */
+QPushButton#MenuBtn QLabel {
+    color: #ecf0f1; /* Cor branca padrão do menu */
+    background-color: transparent;
+    border: none;
+    font-size: 15px; /* Garante o mesmo tamanho de fonte dos outros botões */
+}
+QPushButton#MenuBtn:checked QLabel {
+    font-weight: bold; /* Deixa o texto em negrito quando o botão está selecionado */
+}
 
 /* Tabelas */
 QTableWidget { 

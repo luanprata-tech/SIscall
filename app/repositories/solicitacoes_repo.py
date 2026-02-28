@@ -64,12 +64,75 @@ class SolicitacaoContaRepository:
         try:
             solicitacao = session.query(SolicitacaoConta).get(solicitacao_id)
             if solicitacao:
-                solicitacao.status = "Finalizado"
-                solicitacao.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                solicitacao.status = "Resolvido"
                 solicitacao.credenciais_criadas = credenciais
                 session.commit()
         except:
             session.rollback()
             raise
+        finally:
+            session.close()
+
+    def tem_solicitacao_ativa_por_usuario(self, usuario_id: int) -> bool:
+        """
+        Verifica se um usuário já possui uma solicitação de criação de conta
+        com status 'Aberto' ou 'Em andamento'.
+        """
+        session = self.session_factory()
+        try:
+            solicitacao_ativa = session.query(SolicitacaoConta).filter(
+                SolicitacaoConta.usuario_id == usuario_id,
+                SolicitacaoConta.status.in_(['Aberto', 'Em andamento'])
+            ).first()
+            return solicitacao_ativa is not None
+        finally:
+            session.close()
+
+    def listar_por_usuario(self, usuario_id: int) -> List[SolicitacaoConta]:
+        """Lista todas as solicitações de um usuário, ordenadas pela mais recente."""
+        session = self.session_factory()
+        try:
+            return session.query(SolicitacaoConta).filter(
+                SolicitacaoConta.usuario_id == usuario_id
+            ).order_by(SolicitacaoConta.data_abertura.desc()).all()
+        finally:
+            session.close()
+
+    def excluir(self, solicitacao_id: int):
+        """Exclui uma solicitação pelo seu ID."""
+        session = self.session_factory()
+        try:
+            solicitacao = session.query(SolicitacaoConta).filter_by(id=solicitacao_id).first()
+            if solicitacao:
+                session.delete(solicitacao)
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    def fechar_solicitacao(self, solicitacao_id: int):
+        """Muda o status de uma solicitação para 'Finalizado', a pedido do usuário."""
+        session = self.session_factory()
+        try:
+            solicitacao = session.query(SolicitacaoConta).filter_by(id=solicitacao_id).first()
+            if solicitacao:
+                solicitacao.status = "Finalizado"
+                solicitacao.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    def listar_todas(self) -> List[SolicitacaoConta]:
+        """Lista todas as solicitações, incluindo as finalizadas."""
+        session = self.session_factory()
+        try:
+            return session.query(SolicitacaoConta)\
+                .options(joinedload(SolicitacaoConta.usuario), joinedload(SolicitacaoConta.suporte))\
+                .order_by(SolicitacaoConta.data_abertura.desc()).all()
         finally:
             session.close()
