@@ -7,8 +7,10 @@ class ChamadoController:
         self.repo = repo
 
     def criar_chamado(self, usuario_id, descricao, maquina):
-        if self.repo.possui_chamado_ativo(usuario_id):
-            raise ValueError("Você já possui um chamado em aberto ou em andamento. Aguarde a finalização para abrir um novo.")
+        # Nova regra: permite múltiplos chamados, mas bloqueia enquanto houver
+        # algum chamado do usuário com status 'Resolvido' (aguardando confirmação).
+        if hasattr(self.repo, 'tem_resolvido_pendente_por_usuario') and self.repo.tem_resolvido_pendente_por_usuario(usuario_id):
+            raise ValueError("Você possui chamados resolvidos aguardando confirmação. Confirme o fechamento antes de abrir novos chamados.")
 
         if not descricao.strip():
             raise ValueError("Descrição não pode estar vazia.")

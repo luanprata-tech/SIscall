@@ -17,7 +17,8 @@ CREATE TABLE usuarios (
     senha VARCHAR NOT NULL,
     tipo INTEGER NOT NULL,  -- 0 = Comum, 1 = Admin
     setor VARCHAR,
-    trocar_senha BOOLEAN DEFAULT FALSE
+    trocar_senha BOOLEAN DEFAULT FALSE,
+    ativo BOOLEAN DEFAULT TRUE NOT NULL
 );
 
 -- Tabela de Chamados

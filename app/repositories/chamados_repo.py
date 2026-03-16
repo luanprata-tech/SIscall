@@ -23,6 +23,18 @@ class ChamadoRepository:
         finally:
             session.close()
 
+    def tem_resolvido_pendente_por_usuario(self, usuario_id: int) -> bool:
+        """Retorna True se o usuário possuir ao menos um chamado com status 'Resolvido' (aguardando confirmação)."""
+        session = self.session_factory()
+        try:
+            count = session.query(Chamado).filter(
+                Chamado.usuario_id == usuario_id,
+                Chamado.status == 'Resolvido'
+            ).count()
+            return count > 0
+        finally:
+            session.close()
+
     def criar(self, usuario_id: int, descricao: str, maquina: str):
         session = self.session_factory()
         try:
@@ -44,7 +56,7 @@ class ChamadoRepository:
     def assumir_atendimento(self, chamado_id: int, suporte_id: int):
         session = self.session_factory()
         try:
-            chamado = session.query(Chamado).get(chamado_id)
+            chamado = session.get(Chamado, chamado_id)
             if chamado:
                 chamado.status = "Em andamento"
                 chamado.suporte_id = suporte_id
@@ -59,7 +71,7 @@ class ChamadoRepository:
     def finalizar_atendimento(self, chamado_id: int, diagnostico: str, solucao: str):
         session = self.session_factory()
         try:
-            chamado = session.query(Chamado).get(chamado_id)
+            chamado = session.get(Chamado, chamado_id)
             if chamado:
                 chamado.status = "Resolvido"
                 chamado.diagnostico = diagnostico
@@ -75,7 +87,7 @@ class ChamadoRepository:
         """Fecha o chamado, chamado pelo usuário."""
         session = self.session_factory()
         try:
-            chamado = session.query(Chamado).get(chamado_id)
+            chamado = session.get(Chamado, chamado_id)
             if chamado and chamado.status == 'Resolvido':
                 chamado.status = 'Finalizado'
                 chamado.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -98,7 +110,7 @@ class ChamadoRepository:
     def excluir(self, chamado_id: int):
         session = self.session_factory()
         try:
-            chamado = session.query(Chamado).get(chamado_id)
+            chamado = session.get(Chamado, chamado_id)
             if chamado:
                 session.delete(chamado)
                 session.commit()
@@ -134,7 +146,7 @@ class ChamadoRepository:
     def atualizar_status(self, chamado_id: int, novo_status: str):
         session = self.session_factory()
         try:
-            chamado = session.query(Chamado).get(chamado_id)
+            chamado = session.get(Chamado, chamado_id)
             if chamado:
                 chamado.status = novo_status
                 session.commit()

@@ -13,7 +13,10 @@ class Usuario(Base):
     setor = Column(String, nullable=True)
     
     # Flag para forçar troca de senha no próximo login
-    trocar_senha = Column(Boolean, default=False) 
+    trocar_senha = Column(Boolean, default=False)
 
-    chamados_abertos = relationship("Chamado", foreign_keys="[Chamado.usuario_id]", back_populates="usuario")
-    chamados_atendidos = relationship("Chamado", foreign_keys="[Chamado.suporte_id]", back_populates="suporte")
+    # Flag para marcar usuário como ativo/inativo (soft delete)
+    ativo = Column(Boolean, default=True, nullable=False)
+
+    chamados_abertos = relationship("Chamado", foreign_keys="Chamado.usuario_id", back_populates="usuario")
+    chamados_atendidos = relationship("Chamado", foreign_keys="Chamado.suporte_id", back_populates="suporte")

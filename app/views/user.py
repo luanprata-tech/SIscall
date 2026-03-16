@@ -5,6 +5,8 @@ from PySide6.QtWidgets import (
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMessageBox, QDialog, QScrollArea, QLineEdit
 )
+import os
+import sys
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon, QFont, QColor
 from datetime import datetime
@@ -20,6 +22,20 @@ class UserWindow(QMainWindow):
         self.auth_controller = auth_controller
         self.logout_callback = logout_callback
         self.setWindowTitle(f"Painel - {user.nome}")
+        # Definir ícone da janela (suporta executável empacotado)
+        try:
+            def resource_path(relative_path: str) -> str:
+                if getattr(sys, 'frozen', False):
+                    base_path = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+                else:
+                    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+                return os.path.join(base_path, 'assets', relative_path)
+
+            icon_path = resource_path('icon.ico')
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
         
         self.items_per_page = 15
         self.current_page_meus_chamados = 1
@@ -70,7 +86,6 @@ class UserWindow(QMainWindow):
             self.btn_register.setIcon(QIcon.fromTheme("contact-new"))
             self.btn_register.setCheckable(True)
             self.btn_register.clicked.connect(lambda: self.switch_page(2))
-            sidebar_layout.addWidget(self.btn_register)
 
         btn_logout = QPushButton("Sair")
         btn_logout.setObjectName("MenuBtn")
@@ -81,6 +96,9 @@ class UserWindow(QMainWindow):
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(self.btn_new_ticket)
         sidebar_layout.addWidget(self.btn_my_tickets)
+        # Se for responsável, adiciona o botão de cadastro logo abaixo de 'Meus Chamados'
+        if hasattr(self, 'btn_register'):
+            sidebar_layout.addWidget(self.btn_register)
         sidebar_layout.addStretch()
         sidebar_layout.addWidget(btn_logout)
 
@@ -118,10 +136,19 @@ class UserWindow(QMainWindow):
 
         form_layout.addWidget(QLabel("Máquina / Dispositivo:"))
         self.combo_machine = QComboBox()
-        self.combo_machine.addItems([
-            "COMPUTADOR", "NOTEBOOK", "IMPRESSORA", "TELEFONE",
-            "INTERNET", "SCANNER", "Gestão de Contas", "Outro Dispositivo"
-        ])
+        # Adiciona itens com label (visível) e value (armazenado) separados.
+        machines = [
+            ("COMPUTADOR", "COMPUTADOR"),
+            ("NOTEBOOK", "NOTEBOOK"),
+            ("IMPRESSORA", "IMPRESSORA"),
+            ("TELEFONE", "TELEFONE"),
+            ("INTERNET", "INTERNET"),
+            ("SCANNER", "SCANNER"),
+            ("Liberação de usuários para acesso ao sistema", "Solicitação de acesso"),
+            ("Outro Dispositivo", "Outro Dispositivo")
+        ]
+        for label, value in machines:
+            self.combo_machine.addItem(label, value)
         self.combo_machine.currentIndexChanged.connect(self.on_machine_changed)
         form_layout.addWidget(self.combo_machine)
 
@@ -129,11 +156,12 @@ class UserWindow(QMainWindow):
         self.contas_layout = QVBoxLayout(self.contas_container)
         self.contas_layout.setSpacing(8)
         
-        self.contas_label = QLabel("Selecione os sistemas para os quais precisa de acesso:")
+        self.contas_label = QLabel("Clique no sistema que precisa de acesso:")
         self.contas_label.setStyleSheet("color: #2c3e50; font-weight: bold;")
+        self.contas_label.setVisible(False)
         
         self.checkboxes_contas = {}
-        sistemas = ["IGESP","EXPRESSO","REDE","SGI","SISGERI"]
+        sistemas = ["IGESP","EXPRESSO","REDE","SGI","SISGERI","SISCALL"]
         
         for sistema in sistemas:
             cb = QCheckBox(sistema)
@@ -145,9 +173,10 @@ class UserWindow(QMainWindow):
         form_layout.addWidget(self.contas_label)
         form_layout.addWidget(self.contas_container)
 
-        form_layout.addWidget(QLabel("Descrição do Problema:"))
+        self.lbl_desc = QLabel("Descrição do Problema:")
+        form_layout.addWidget(self.lbl_desc)
         self.txt_desc = QPlainTextEdit()
-        self.txt_desc.setPlaceholderText("Descreva o motivo do chamado...")
+        self.txt_desc.setPlaceholderText("Digite aqui...")
         self.txt_desc.setMinimumHeight(150)
         self.txt_desc.setStyleSheet("border: 1px solid #ccc; background-color: white; color: #333;")
         form_layout.addWidget(self.txt_desc)
@@ -164,9 +193,24 @@ class UserWindow(QMainWindow):
         return widget
 
     def on_machine_changed(self):
-        is_conta = self.combo_machine.currentText() == "Gestão de Contas"
+        # Verifica pelo valor associado (userData). Para a opção de contas,
+        # o value é 'Solicitação de acesso'.
+        is_conta = (self.combo_machine.currentData() == "Solicitação de acesso")
         self.contas_label.setVisible(is_conta)
         self.contas_container.setVisible(is_conta)
+        # Ajusta o texto do label de descrição quando for solicitação de acesso
+        if is_conta:
+            try:
+                self.lbl_desc.setText("Use o campo abaixo para informar o usuário que deve ser criado ou redefinido:")
+                self.txt_desc.setPlaceholderText("Caso selecione Expresso, enviar nome de usuário, CPF e um email para receber a senha provisória.")
+            except Exception:
+                pass
+        else:
+            try:
+                self.lbl_desc.setText("Descrição do Problema:")
+                self.txt_desc.setPlaceholderText("Digite aqui...")
+            except Exception:
+                pass
         if not is_conta:
             for cb in self.checkboxes_contas.values():
                 cb.setChecked(False)
@@ -185,7 +229,7 @@ class UserWindow(QMainWindow):
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 200)
         self.table.setColumnWidth(4, 120) 
-        self.table.setColumnWidth(5, 320) # Aumentado para caber os botões de confirmação e detalhes
+        self.table.setColumnWidth(5, 250)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -246,7 +290,7 @@ class UserWindow(QMainWindow):
         self.reg_senha = QLineEdit(); self.reg_senha.setPlaceholderText("Senha"); self.reg_senha.setEchoMode(QLineEdit.Password)
         form_layout.addWidget(QLabel("Senha:")); form_layout.addWidget(self.reg_senha)
 
-        form_layout.addWidget(QLabel("Setor (Fixo):"))
+        form_layout.addWidget(QLabel("Setor:"))
         self.reg_setor = QLineEdit(self.user.setor)
         self.reg_setor.setReadOnly(True)
         self.reg_setor.setStyleSheet("background-color: #f0f0f0; color: #555;")
@@ -287,13 +331,13 @@ class UserWindow(QMainWindow):
             solicitacoes = self.solicitacao_controller.listar_minhas_solicitacoes(self.user.id)
             for s in solicitacoes:
                 s.tipo_item = 'solicitacao'
-                s.maquina = "Gestão de Contas"  # Atributo para exibição correta na tabela
+                s.maquina = "Solicitação de acesso"  # Atributo para exibição correta na tabela
 
             # 3. Unir as duas listas
             todos_itens = chamados + solicitacoes
 
-            # 4. Ordenar a lista unificada pela data de abertura
-            todos_itens.sort(key=lambda x: getattr(x, 'data_abertura', ''), reverse=True)
+            # 4. Ordenar a lista unificada: primeiro os com status "Resolvido", depois pelos demais por data
+            todos_itens.sort(key=lambda x: (x.status == 'Resolvido', getattr(x, 'data_abertura', '')), reverse=True)
 
             total_items = len(todos_itens)
             self.total_pages_meus_chamados = (total_items + self.items_per_page - 1) // self.items_per_page or 1
@@ -344,6 +388,13 @@ class UserWindow(QMainWindow):
             try: return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
             except: return None
             
+        def is_senha_request(item):
+            # treat any solicitacao whose description mentions 'senha' as a password request
+            try:
+                return item.tipo_item == 'solicitacao' and item.descricao and 'senha' in item.descricao.lower()
+            except Exception:
+                return False
+        
         table.setRowCount(len(chamados))
         for i, c in enumerate(chamados):
             dt = parse_date(c.data_abertura)
@@ -372,24 +423,24 @@ class UserWindow(QMainWindow):
 
                 if c.status == "Aberto":
                     btn_del = QPushButton("Excluir"); btn_del.setObjectName("Danger")
-                    btn_del.setFixedSize(90, 36)
+                    btn_del.setFixedSize(90, 42)
                     btn_del.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.deletar_chamado(cid, ctype))
                     layout.addWidget(btn_del)
                 elif c.status == "Resolvido":
-                    btn_details = QPushButton("Ver Detalhes")
-                    btn_details.setObjectName("Info")
-                    btn_details.setFixedSize(120, 36)
-                    btn_details.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.ver_detalhes_chamado(cid, ctype))
-                    layout.addWidget(btn_details)
-
-                    btn_confirm = QPushButton("Confirmar e Fechar"); btn_confirm.setObjectName("SubmitBtn") 
-                    btn_confirm.setFixedSize(180, 36)
-                    btn_confirm.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.confirmar_fechamento(cid, ctype))
-                    layout.addWidget(btn_confirm)
+                    if c.tipo_item == 'solicitacao':
+                        btn_confirm = QPushButton("Confirmar Atendimento"); btn_confirm.setObjectName("SubmitBtn") 
+                        btn_confirm.setFixedSize(220, 42)
+                        btn_confirm.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.abrir_confirmacao_solicitacao(cid))
+                        layout.addWidget(btn_confirm)
+                    else:
+                        btn_confirm = QPushButton("Confirmar Atendimento"); btn_confirm.setObjectName("SubmitBtn") 
+                        btn_confirm.setFixedSize(220, 42)
+                        btn_confirm.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.confirmar_fechamento(cid, ctype))
+                        layout.addWidget(btn_confirm)
                 elif c.status == "Finalizado":
                     btn_details = QPushButton("Detalhes")
                     btn_details.setObjectName("Info")
-                    btn_details.setFixedSize(90, 36)
+                    btn_details.setFixedSize(90, 42)
                     btn_details.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.ver_detalhes_chamado(cid, ctype))
                     layout.addWidget(btn_details)
                 table.setCellWidget(i, 5, cell_widget)
@@ -397,10 +448,12 @@ class UserWindow(QMainWindow):
 
     def criar_chamado(self):
         try:
-            maquina = self.combo_machine.currentText()
+            # Preferir o valor associado (userData) para salvar no banco;
+            # se não houver, usa o texto visível.
+            maquina = self.combo_machine.currentData() or self.combo_machine.currentText()
             descricao = self.txt_desc.toPlainText()
             
-            if maquina == "Gestão de Contas":
+            if maquina == "Solicitação de acesso":
                 contas_selecionadas = [sistema for sistema, cb in self.checkboxes_contas.items() if cb.isChecked()]
                 if not contas_selecionadas:
                     raise ValueError("Para uma solicitação de acesso, selecione pelo menos um sistema!")
@@ -431,7 +484,7 @@ class UserWindow(QMainWindow):
                 self.load_data()
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
-    def confirmar_fechamento(self, item_id, item_type):
+    def confirmar_fechamento(self, item_id, item_type, dialog=None):
         confirm = QMessageBox.question(self, "Confirmar Resolução", 
                                        "Você confirma que a solicitação foi atendida? Esta ação fechará o item permanentemente.",
                                        QMessageBox.Yes | QMessageBox.No)
@@ -443,6 +496,8 @@ class UserWindow(QMainWindow):
                     self.solicitacao_controller.fechar_solicitacao_pelo_usuario(item_id, self.user.id)
                 
                 QMessageBox.information(self, "Sucesso", "Item fechado com sucesso!")
+                if dialog:
+                    dialog.accept()
                 self.load_data()
             except Exception as e:
                 QMessageBox.warning(self, "Erro", str(e))
@@ -462,7 +517,7 @@ class UserWindow(QMainWindow):
             
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Detalhes do Item #{item_id}")
-            dialog.setFixedSize(500, 400)
+            dialog.setFixedSize(700, 700)
             dialog.setStyleSheet("background-color: #f0f3f4;")
             
             layout = QVBoxLayout(dialog)
@@ -504,38 +559,223 @@ class UserWindow(QMainWindow):
                 scroll_layout.addWidget(sistemas_label)
                 scroll_layout.addSpacing(15)
 
+                # show note for Expresso password delivery when request is no longer open
+                is_expresso = False
+                try:
+                    if 'EXPRESSO' in item.sistemas_solicitados.upper():
+                        is_expresso = True
+                    if is_expresso and item.status in ('Resolvido', 'Finalizado'):
+                        note = QLabel("A senha provisória do EXPRESSO será enviada para o email fornecido.")
+                        note.setStyleSheet("color: #555; font-style: italic;")
+                        scroll_layout.addWidget(note)
+                        scroll_layout.addSpacing(15)
+                except Exception:
+                    pass
+
+                # always build credentials block if data exists; filtering occurs later during iteration
                 if hasattr(item, 'credenciais_criadas') and item.credenciais_criadas:
-                    scroll_layout.addWidget(QLabel("<b>Credenciais Criadas:</b>"))
+                    scroll_layout.addWidget(QLabel("<b>Credenciais:</b>"))
+                    
+                    # Criar scroll para credenciais
+                    cred_scroll = QScrollArea()
+                    cred_scroll.setWidgetResizable(True)
+                    cred_scroll.setStyleSheet("background-color:#e8f4f8; border: 1px solid #add8e6;")
                     
                     cred_widget = QWidget()
-                    cred_widget.setStyleSheet("background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6;")
+                    cred_widget.setStyleSheet("background-color:#e8f4f8;")
                     cred_layout = QVBoxLayout(cred_widget)
+                    cred_layout.setSpacing(10)
 
                     try:
                         credenciais_data = json.loads(item.credenciais_criadas)
                         for sistema, cred in credenciais_data.items():
-                            cred_label = QLabel(f"<b>{sistema}:</b> {cred}")
-                            cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                            cred_layout.addWidget(cred_label)
+                            # skip expresso entry if present
+                            if sistema.strip().upper() == 'EXPRESSO':
+                                continue
+                            # Parsear "login|senha"
+                            if '|' in cred:
+                                login, senha = cred.split('|', 1)
+                            else:
+                                login, senha = cred, "***"
+                            
+                            # Frame para cada sistema
+                            system_frame = QWidget()
+                            system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
+                            system_layout = QVBoxLayout(system_frame)
+                            system_layout.setSpacing(3)
+                            system_layout.setContentsMargins(10, 10, 10, 10)
+                            
+                            # Título do sistema
+                            title = QLabel(f"<b>{sistema}</b>")
+                            system_layout.addWidget(title)
+                            
+                            # Login
+                            login_label = QLabel(f"<b>Login:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{login}</span>")
+                            login_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                            system_layout.addWidget(login_label)
+                            
+                            # Senha
+                            senha_label = QLabel(f"<b>Senha:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{senha}</span>")
+                            senha_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                            system_layout.addWidget(senha_label)
+                            
+                            cred_layout.addWidget(system_frame)
                     except (json.JSONDecodeError, TypeError):
                         cred_label = QLabel(item.credenciais_criadas)
                         cred_label.setWordWrap(True)
                         cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
                         cred_layout.addWidget(cred_label)
                     
-                    scroll_layout.addWidget(cred_widget)
+                    cred_layout.addStretch()
+                    cred_scroll.setWidget(cred_widget)
+                    scroll_layout.addWidget(cred_scroll)
             
             scroll_layout.addStretch()
             scroll.setWidget(scroll_content)
             layout.addWidget(scroll)
             
-            btn_close = QPushButton("Fechar")
-            btn_close.clicked.connect(dialog.accept)
-            layout.addWidget(btn_close)
-            
+            # if this is a password-type solicitation still needing user confirmation,
+            # add a confirm button below the scroll area within the dialog
+            try:
+                is_senha = False
+                if item_type == 'solicitacao' and item.status == 'Resolvido':
+                    if hasattr(item, 'descricao') and item.descricao and 'senha' in item.descricao.lower():
+                        is_senha = True
+                if is_senha:
+                    btn = QPushButton("Confirmar Atendimento")
+                    btn.setObjectName("SubmitBtn")
+                    def do_confirm():
+                        self.confirmar_fechamento(item_id, item_type)
+                        dialog.accept()
+                    btn.clicked.connect(do_confirm)
+                    layout.addWidget(btn)
+            except Exception:
+                pass
             dialog.exec()
         except Exception as e:
             QMessageBox.warning(self, "Erro", f"Erro ao abrir detalhes: {str(e)}")
+
+    def abrir_confirmacao_solicitacao(self, solicitacao_id):
+        try:
+            item = self.solicitacao_controller.buscar_por_id(solicitacao_id)
+            if not item:
+                QMessageBox.warning(self, "Erro", "Solicitação não encontrada!")
+                return
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Confirmar Atendimento da Solicitação #{solicitacao_id}")
+            dialog.setFixedSize(700,700)
+            dialog.setStyleSheet("background-color: #f0f3f4;")
+            
+            layout = QVBoxLayout(dialog)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setStyleSheet("border: none;")
+            scroll_content = QWidget()
+            scroll_content.setStyleSheet("background-color: #f0f3f4;")
+            scroll_layout = QVBoxLayout(scroll_content)
+            
+            # Detalhes da solicitação
+            scroll_layout.addWidget(QLabel("<b>Sistemas Solicitados:</b>"))
+            sistemas_label = QLabel(item.sistemas_solicitados.replace(',', '\n'))
+            sistemas_label.setWordWrap(True)
+            sistemas_label.setStyleSheet("background-color:#f5f5f5; padding:10px; border-radius:4px;")
+            scroll_layout.addWidget(sistemas_label)
+            scroll_layout.addSpacing(15)
+
+            # Nota para EXPRESSO
+            try:
+                if 'EXPRESSO' in item.sistemas_solicitados.upper() and item.status in ('Resolvido', 'Finalizado'):
+                    note = QLabel("<i>Para solicitações do EXPRESSO a senha provisória será enviada para o email fornecido.</i>")
+                    note.setStyleSheet("color: #555; font-style: italic;")
+                    scroll_layout.addWidget(note)
+                    scroll_layout.addSpacing(15)
+            except Exception:
+                pass
+
+            # Credenciais, filtrando EXPRESSO
+            if hasattr(item, 'credenciais_criadas') and item.credenciais_criadas:
+                scroll_layout.addWidget(QLabel("<b>Credenciais Criadas:</b>"))
+                
+                cred_scroll = QScrollArea()
+                cred_scroll.setWidgetResizable(True)
+                cred_scroll.setStyleSheet("background-color:#e8f4f8; border: 1px solid #add8e6;")
+                
+                cred_widget = QWidget()
+                cred_widget.setStyleSheet("background-color:#e8f4f8;")
+                cred_layout = QVBoxLayout(cred_widget)
+                cred_layout.setSpacing(10)
+
+                try:
+                    credenciais_data = json.loads(item.credenciais_criadas)
+                    for sistema, cred in credenciais_data.items():
+                        if sistema.strip().upper() == 'EXPRESSO':
+                            continue
+                        if '|' in cred:
+                            login, senha = cred.split('|', 1)
+                        else:
+                            login, senha = cred, "***"
+                        
+                        system_frame = QWidget()
+                        system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
+                        system_layout = QVBoxLayout(system_frame)
+                        system_layout.setSpacing(3)
+                        system_layout.setContentsMargins(10, 10, 10, 10)
+                        
+                        title = QLabel(f"<b>{sistema}</b>")
+                        system_layout.addWidget(title)
+                        
+                        login_label = QLabel(f"<b>Login:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{login}</span>")
+                        login_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                        system_layout.addWidget(login_label)
+                        
+                        senha_label = QLabel(f"<b>Senha:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{senha}</span>")
+                        senha_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                        system_layout.addWidget(senha_label)
+                        
+                        cred_layout.addWidget(system_frame)
+                except (json.JSONDecodeError, TypeError):
+                    cred_label = QLabel(item.credenciais_criadas)
+                    cred_label.setWordWrap(True)
+                    cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                    cred_layout.addWidget(cred_label)
+                
+                cred_layout.addStretch()
+                cred_scroll.setWidget(cred_widget)
+                scroll_layout.addWidget(cred_scroll)
+            
+            scroll_layout.addStretch()
+            scroll.setWidget(scroll_content)
+            layout.addWidget(scroll)
+            
+            # Botão para confirmar
+            btn_confirm = QPushButton("Confirmar Atendimento")
+            btn_confirm.setObjectName("SubmitBtn")
+            btn_confirm.setMinimumHeight(40)
+            btn_confirm.setMinimumWidth(200)
+            btn_confirm.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 10px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+                QPushButton:pressed {
+                    background-color: #3e8e41;
+                }
+            """)
+            btn_confirm.clicked.connect(lambda: self.confirmar_fechamento(solicitacao_id, 'solicitacao', dialog))
+            layout.addWidget(btn_confirm)
+            
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Erro ao abrir confirmação: {str(e)}")
 
     def registrar_usuario(self):
         try:

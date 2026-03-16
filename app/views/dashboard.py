@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QFrame, QGridLayout
 )
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QFont, QBrush
+from PySide6.QtGui import QColor, QFont, QBrush, QIcon
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from datetime import datetime
 
@@ -34,6 +34,21 @@ class DashboardWindow(QMainWindow):
         self.setWindowTitle("Dashboard de Chamados Abertos")
         self.setMinimumSize(1280, 720)
         self.setStyleSheet("background-color: #2c3e50;") # Tema escuro para a TV
+
+        # Definir ícone da janela (suporta executável empacotado)
+        try:
+            def resource_path(relative_path: str) -> str:
+                if getattr(sys, 'frozen', False):
+                    base_path = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+                else:
+                    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+                return os.path.join(base_path, 'assets', relative_path)
+
+            icon_path = resource_path('icon.ico')
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
 
         self.known_ticket_ids = set()
         self._first_run = True
@@ -160,8 +175,18 @@ class DashboardWindow(QMainWindow):
         self.audio_output = QAudioOutput()
         self.player.setAudioOutput(self.audio_output)
         
-        # Constrói o caminho para a pasta 'assets' na raiz do projeto
-        sound_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'notification.wav')) # Usando .wav
+        # Helper para localizar recursos tanto em execução normal quanto quando empacotado (PyInstaller)
+        def resource_path(relative_path: str) -> str:
+            # Quando empacotado com PyInstaller, os arquivos adicionados com --add-data
+            # ficam disponíveis em sys._MEIPASS. Caso contrário, usamos o caminho relativo ao projeto.
+            if getattr(sys, 'frozen', False):
+                base_path = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+            else:
+                base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            return os.path.join(base_path, 'assets', relative_path)
+
+        # Constrói o caminho para o arquivo de som
+        sound_path = resource_path('notification.wav')
         if os.path.exists(sound_path):
             self.player.setSource(QUrl.fromLocalFile(sound_path))
             self.audio_output.setVolume(1.0)
@@ -171,6 +196,8 @@ class DashboardWindow(QMainWindow):
     def refresh_data(self):
         try:
             chamados = self.controller.listar_pendentes()
+            # Mostrar apenas chamados pendentes e em andamento (excluir 'Resolvido' e 'Finalizado')
+            chamados = [c for c in chamados if getattr(c, 'status', None) in ('Aberto', 'Em andamento')]
             current_ticket_ids = {c.id for c in chamados}
 
             # Verifica se há novos chamados desde a última atualização

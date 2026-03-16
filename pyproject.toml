@@ -10,4 +10,6 @@ dependencies = [
     "psycopg2-binary>=2.9.9",  # Driver PostgreSQL para Python
     "python-dotenv>=1.0.0",    # Para gerenciar variáveis de ambiente
     "pymysql>=1.1.2",
+    "pyinstaller>=6.19.0",
+    "cryptography>=46.0.5",
 ]

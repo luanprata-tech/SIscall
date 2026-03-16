@@ -27,7 +27,8 @@ class AuthController:
             raise ValueError("Este login já está em uso.")
             
         senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-        sucesso = self.repo.criar(nome_completo, login, senha_hash, tipo=tipo, setor=setor)
+        # Ao cadastrar via painel administrativo, marcar como senha provisória
+        sucesso = self.repo.criar(nome_completo, login, senha_hash, tipo=tipo, setor=setor, trocar_senha=True)
         if not sucesso:
             raise ValueError("Erro ao criar usuário.")
 

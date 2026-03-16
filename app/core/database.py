@@ -1,13 +1,43 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 import hashlib
 import os
+import sys
 from dotenv import load_dotenv
 from app.models import Base, Usuario
 
 # Carregar variáveis de ambiente do arquivo .env
-# Este arquivo deve estar na raiz do projeto com credenciais do PostgreSQL
-load_dotenv()
+# Quando empacotado com PyInstaller, o .env pode ser incluído dentro da pasta gerada
+# (ex: dist\main\.config\.env) — detectamos o ambiente "frozen" e buscamos no
+# diretório interno (`sys._MEIPASS`) primeiro. Caso não exista, tentamos o .env
+# na raiz do projeto (modo dev) e, se nada for encontrado, deixamos o dotenv
+# tentar carregar variáveis de ambiente do ambiente atual.
+env_loaded = False
+try:
+    if getattr(sys, 'frozen', False):
+        base = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+        candidate = os.path.join(base, '.config', '.env')
+        if os.path.exists(candidate):
+            load_dotenv(candidate)
+            env_loaded = True
+        else:
+            # Também verificar se foi incluído diretamente em base
+            candidate2 = os.path.join(base, '.env')
+            if os.path.exists(candidate2):
+                load_dotenv(candidate2)
+                env_loaded = True
+    if not env_loaded:
+        # Ambiente de desenvolvimento: .env na raiz do projeto
+        project_env = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+        if os.path.exists(project_env):
+            load_dotenv(project_env)
+            env_loaded = True
+except Exception:
+    pass
+
+# Fallback: tenta carregar qualquer .env no ambiente (sem path) se nada foi carregado
+if not env_loaded:
+    load_dotenv()
 
 class DatabaseManager:
     def __init__(self, connection_string=None):
@@ -71,7 +101,30 @@ class DatabaseManager:
 
     def setup(self):
         Base.metadata.create_all(self.engine)
+        self._ensure_usuario_ativo_column()
         self._criar_dados_iniciais()
+
+    def _ensure_usuario_ativo_column(self):
+        """Garante que a coluna `ativo` exista na tabela de usuários.
+
+        Isso permite que atualizações em produção adicionem o campo sem exigir
+        migrações externas (útil para instalações com SQLite ou PostgreSQL).
+        """
+        inspector = inspect(self.engine)
+        if 'usuarios' not in inspector.get_table_names():
+            return
+        cols = [c['name'] for c in inspector.get_columns('usuarios')]
+        if 'ativo' in cols:
+            return
+
+        # Adiciona a coluna com valor padrão para não quebrar dados existentes.
+        with self.engine.begin() as conn:
+            if self.engine.dialect.name == 'sqlite':
+                conn.execute(text('ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT 1 NOT NULL'))
+            elif self.engine.dialect.name == 'postgresql':
+                conn.execute(text('ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE NOT NULL'))
+            else:
+                conn.execute(text('ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE'))
 
     def _criar_dados_iniciais(self):
         session = self.Session()

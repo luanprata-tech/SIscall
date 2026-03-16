@@ -1,4 +1,6 @@
 # views/admin.py
+import os
+import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, 
@@ -17,7 +19,24 @@ class AdminWindow(QMainWindow):
         super().__init__()
         self.user = user
         self.controller = chamado_controller
+        # Inicializa referências que podem ser injetadas após a criação
+        self.auth_controller = None
+        self.solicitacao_controller = None
         self.logout_callback = logout_callback
+        # Definir ícone da janela (usa assets/icon.ico e suporta PyInstaller)
+        try:
+            def resource_path(relative_path: str) -> str:
+                if getattr(sys, 'frozen', False):
+                    base_path = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+                else:
+                    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+                return os.path.join(base_path, 'assets', relative_path)
+
+            icon_path = resource_path('icon.ico')
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
         self.setWindowTitle("Gestão de Chamados - Admin")
 
         self.items_per_page = 20
@@ -116,11 +135,11 @@ class AdminWindow(QMainWindow):
         
         table.setColumnWidth(0, 150)
         table.setColumnWidth(1, 150)
-        table.setColumnWidth(2, 120)
+        table.setColumnWidth(2, 150)
         table.setColumnWidth(3, 90)
         table.setColumnWidth(4, 90)
         table.setColumnWidth(6, 150) 
-        table.setColumnWidth(7, 200)
+        table.setColumnWidth(7, 220)
         table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -169,7 +188,7 @@ class AdminWindow(QMainWindow):
         table.setColumnWidth(3, 90)
         table.setColumnWidth(4, 90)
         table.setColumnWidth(5, 150)
-        table.setColumnWidth(6, 200)
+        table.setColumnWidth(6, 220)
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         
 
@@ -235,7 +254,7 @@ class AdminWindow(QMainWindow):
         filter_layout = QHBoxLayout()
         self.txt_search_user = QLineEdit(); self.txt_search_user.setPlaceholderText("Buscar por Nome ou Login...")
         self.txt_search_user.textChanged.connect(self.load_users)
-        self.combo_filter_setor = QComboBox(); self.combo_filter_setor.addItems(["Todos", "Administrativo", "Comercial / Vendas", "Financeiro", "Recursos Humanos (RH)", "TI - Desenvolvimento", "TI - Infraestrutura", "Operacional / Logística", "Jurídico", "Marketing"])
+        self.combo_filter_setor = QComboBox(); self.combo_filter_setor.addItems(["Todos","AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
         self.combo_filter_setor.currentTextChanged.connect(self.load_users)
         
         btn_new_user = QPushButton("Novo Usuário")
@@ -252,7 +271,7 @@ class AdminWindow(QMainWindow):
         
         self.table_users.setColumnWidth(1, 150)
         self.table_users.setColumnWidth(2, 200)
-        self.table_users.setColumnWidth(3, 200)
+        self.table_users.setColumnWidth(3, 220)
         self.table_users.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         
         self.table_users.verticalHeader().setMinimumSectionSize(70) 
@@ -284,7 +303,12 @@ class AdminWindow(QMainWindow):
         usuarios = self.auth_controller.listar_usuarios(termo, setor)
         self.table_users.setRowCount(len(usuarios))
         for i, u in enumerate(usuarios):
-            nome_display = u.nome + (" (Admin)" if u.tipo == 1 else "")
+            if u.tipo == 1:
+                nome_display = u.nome + " (Admin)"
+            elif u.tipo == 2:
+                nome_display = u.nome + " (Responsável)"
+            else:
+                nome_display = u.nome
             self.table_users.setItem(i, 0, QTableWidgetItem(nome_display))
             self.table_users.setItem(i, 1, QTableWidgetItem(u.login))
             self.table_users.setItem(i, 2, QTableWidgetItem(u.setor or "-"))
@@ -308,7 +332,12 @@ class AdminWindow(QMainWindow):
         self.load_users()
 
     def excluir_usuario(self, user_id):
-        confirm = QMessageBox.question(self, "Excluir", "Tem certeza?", QMessageBox.Yes | QMessageBox.No)
+        confirm = QMessageBox.question(
+            self,
+            "Desativar Usuário",
+            "Deseja desativar este usuário? Ele não aparecerá mais na gestão, mas permanecerá no banco de dados para manter o histórico.",
+            QMessageBox.Yes | QMessageBox.No
+        )
         if confirm == QMessageBox.Yes:
             try: self.auth_controller.excluir_usuario(user_id); self.load_users()
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
@@ -327,7 +356,12 @@ class AdminWindow(QMainWindow):
         current_idx = self.pages.currentIndex()
         try:            
             # Busca as solicitações pendentes para atualizar o contador e, se necessário, a tabela.
-            solicitacoes_pendentes = self.solicitacao_controller.listar_pendentes()
+            solicitacoes_pendentes = []
+            if hasattr(self, 'solicitacao_controller') and self.solicitacao_controller:
+                try:
+                    solicitacoes_pendentes = self.solicitacao_controller.listar_pendentes()
+                except Exception as e:
+                    print(f"Erro ao listar solicitações pendentes: {e}")
             count = len(solicitacoes_pendentes)
 
             # Atualiza o badge
@@ -349,11 +383,16 @@ class AdminWindow(QMainWindow):
                 for c in chamados:
                     c.tipo_item = 'chamado'
 
-                # 2. Buscar todas as solicitações
-                solicitacoes = self.solicitacao_controller.listar_todas_solicitacoes()
+                # 2. Buscar todas as solicitações (se o controller estiver disponível)
+                solicitacoes = []
+                if hasattr(self, 'solicitacao_controller') and self.solicitacao_controller:
+                    try:
+                        solicitacoes = self.solicitacao_controller.listar_todas_solicitacoes()
+                    except Exception as e:
+                        print(f"Erro ao listar todas solicitações: {e}")
                 for s in solicitacoes:
                     s.tipo_item = 'solicitacao'
-                    s.maquina = "Gestão de Contas"
+                    s.maquina = "Solicitação de acesso"
                     s.descricao = s.sistemas_solicitados
                 
                 # 3. Unir e ordenar
@@ -423,9 +462,10 @@ class AdminWindow(QMainWindow):
                 is_locked = (c.status == "Em andamento" and not is_mine)
                 if c.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
                 elif is_locked: btn.setText("Bloqueado"); btn.setEnabled(False)
-                elif c.status == "Resolvido": btn.setText("Aguardando Usuário"); btn.setEnabled(False)
+                elif c.status == "Resolvido": btn.setText("Detalhes"); btn.setObjectName("Info"); btn.setEnabled(True)
                 else: btn.setText("Continuar"); btn.setObjectName("SubmitBtn"); btn.setEnabled(True)
                 if not is_locked and c.status != 'Resolvido': btn.clicked.connect(lambda _, cid=c.id: self.abrir_atendimento(cid))
+                elif c.status == 'Resolvido': btn.clicked.connect(lambda _, cid=c.id, ctype='chamado': self.ver_detalhes_unificado_admin(cid, ctype))
                 
                 widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn)
                 if bg_color:
@@ -485,14 +525,20 @@ class AdminWindow(QMainWindow):
             is_locked = (s.status == "Em andamento" and not is_mine)
             if s.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
             elif is_locked: btn.setText("Bloqueado"); btn.setEnabled(False)
+            elif s.status == "Resolvido": btn.setText("Detalhes"); btn.setObjectName("Info"); btn.setEnabled(True)
             else: btn.setText("Continuar"); btn.setObjectName("SubmitBtn"); btn.setEnabled(True)
-            if not is_locked: btn.clicked.connect(lambda _, sid=s.id: self.abrir_atendimento_solicitacao(sid))
+            if not is_locked and s.status != 'Resolvido': btn.clicked.connect(lambda _, sid=s.id: self.abrir_atendimento_solicitacao(sid))
+            elif s.status == 'Resolvido': btn.clicked.connect(lambda _, sid=s.id, stype='solicitacao': self.ver_detalhes_unificado_admin(sid, stype))
 
             widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn)
             table.setCellWidget(i, 6, widget)
 
     def abrir_atendimento_solicitacao(self, solicitacao_id):
         self.timer.stop()
+        if not hasattr(self, 'solicitacao_controller') or not self.solicitacao_controller:
+            QMessageBox.warning(self, "Erro", "Controlador de solicitações não inicializado.")
+            self.timer.start(1000)
+            return
         dialog = AccountRequestActionDialog(solicitacao_id, self.solicitacao_controller, self.user, self)
         dialog.exec()
         self.timer.start(1000)
@@ -579,9 +625,7 @@ class AdminWindow(QMainWindow):
             scroll.setWidget(scroll_content)
             layout.addWidget(scroll)
             
-            btn_close = QPushButton("Fechar")
-            btn_close.clicked.connect(dialog.accept)
-            layout.addWidget(btn_close)
+            # Removido botão de fechar redundante — diálogo já fecha pelo botão padrão
             
             dialog.exec()
         except Exception as e:

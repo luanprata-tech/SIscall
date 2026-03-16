@@ -36,7 +36,7 @@ class UserEditDialog(QDialog, CenterMixin):
         # SETOR
         layout.addWidget(QLabel("<b>Setor:</b>"))
         self.combo_setor = QComboBox()
-        self.combo_setor.addItems(["GERH", "ASCOM", "COTRANSP", "GEATEC", "GEINFORM", "GECONF", "GEAAD", "PROJUR", "DIRAF","DITEC","AGEPLAN","PRESIDENCIA","OUVIDORIA","PROTOCOLO","AUDITORIO","LABAGUA","CONSEGER","GEMETRO","GEREMETRO","COMEL","AGEQUALI","CPI","ARRECADAÇÂO","FISCAIS","LABAGUA","LEI","LABORG","LABROMO","LABSOLOS","LABMICRO","PRE-MEDIDOS","GUARITA"])
+        self.combo_setor.addItems(["AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
         self.combo_setor.setCurrentText(self.user.setor)
         layout.addWidget(self.combo_setor)
         
@@ -97,7 +97,7 @@ class UserRegisterDialog(QDialog, CenterMixin):
 
         layout.addWidget(QLabel("Setor:"))
         self.combo_setor = QComboBox()
-        self.combo_setor.addItems(["Selecione seu Setor", "GERH", "ASCOM", "COTRANSP", "GEATEC", "GEINFORM", "GECONF", "GEAAD", "PROJUR", "DIRAF","DITEC","AGEPLAN","PRESIDENCIA","OUVIDORIA","PROTOCOLO","AUDITORIO","LABAGUA","CONSEGER","GEMETRO","GEREMETRO","COMEL","AGEQUALI","CPI","ARRECADAÇÂO","FISCAIS","LABAGUA","LEI","LABORG","LABROMO","LABSOLOS","LABMICRO","PRE-MEDIDOS","GUARITA"])
+        self.combo_setor.addItems(["Selecione seu Setor","AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
         layout.addWidget(self.combo_setor)
 
         layout.addWidget(QLabel("Cargo:"))
@@ -143,9 +143,9 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def setup_ui(self):
         s = self.controller.buscar_por_id(self.solicitacao_id)
-        if s.status == "Em andamento": self.setFixedSize(600, 700)
-        elif s.status == "Aberto": self.setFixedSize(600,500)
-        else: self.setFixedSize(600, 700)
+        if s.status == "Em andamento": self.setFixedSize(900, 800)
+        elif s.status == "Aberto": self.setFixedSize(900,800)
+        else: self.setFixedSize(600, 600)
         self.layout = QVBoxLayout(self)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setStyleSheet("background-color: #fdfdfd; border: none;") 
         scroll_content = QWidget(); scroll_content.setStyleSheet("background-color: #fdfdfd;")
@@ -166,15 +166,10 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         <h3 style='margin:0; color:#2c3e50;'>{s.nome_usuario}</h3>
         <span style='color:#7f8c8d;'>{s.setor_usuario}</span><br><br>
         <b>Aberto em:</b> {s.data_abertura}<br>
-        <b>Status:</b> <b style='font-size:16px; color:{'red' if s.status=='Aberto' else 'blue'}'>{s.status.upper()}</b><br>
-        <hr>
-        <b>Sistemas Solicitados:</b><br>
-        <div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>
-        {s.sistemas_solicitados.replace(',', '<br>')}
-        </div>
+        <b>Status:</b> <b style='font-size:16px; color:{'red' if s.status=='Aberto' else 'blue'}'>{s.status.upper()}</b><br>        
         """
         if s.descricao:
-            info_text += f"<br><b>Observações:</b><br><div style='background-color:#fff; padding:10px; border-radius:4px; border:1px solid #ddd; color: #333;'>{s.descricao}</div>"
+            info_text += f"<br><b>Usuário solicitante:</b><br><div style='background-color:#fff; padding:10px; border-radius:4px; border:1px solid #ddd; color: #333;'>{s.descricao}</div>"
 
         self.lbl_info.setText(info_text)
         while self.action_layout.count():
@@ -195,30 +190,91 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def build_finish_ui(self, solicitacao):
         self.credential_inputs.clear()
-        lbl = QLabel(f"<b>Em atendimento desde:</b> {solicitacao.data_inicio_atendimento}")
-        self.action_layout.addWidget(lbl)
-        self.action_layout.addWidget(QLabel("<b>Preencha as credenciais para cada sistema:</b>"))
-
-        cred_scroll = QScrollArea()
-        cred_scroll.setWidgetResizable(True)
-        cred_scroll.setStyleSheet("background-color: #C4CFED; border: none;")
-        cred_widget = QWidget()
-        cred_layout = QGridLayout(cred_widget)
-        cred_layout.setSpacing(10)
-
-        sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip()]
         
-        for i, sistema in enumerate(sistemas):
-            label = QLabel(f"{sistema}:")
-            line_edit = QLineEdit()
-            line_edit.setPlaceholderText(f"Login | Senha para {sistema}")
-            line_edit.setStyleSheet("background-color: white; color: #333;")
-            self.credential_inputs[sistema] = line_edit
-            cred_layout.addWidget(label, i, 0)
-            cred_layout.addWidget(line_edit, i, 1)
+        # Verificar se tem EXPRESSO
+        tem_expresso = 'EXPRESSO' in solicitacao.sistemas_solicitados.upper()
+        outros_sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip() and s.strip().upper() != 'EXPRESSO']
         
-        cred_scroll.setWidget(cred_widget)
-        self.action_layout.addWidget(cred_scroll)
+        # Se tiver EXPRESSO, mostrar nota
+        if tem_expresso:
+            nota = QLabel("<i>Para EXPRESSO, a senha será enviada via email. Preencha as credenciais para os demais sistemas.</i>")
+            nota.setStyleSheet("color: #555; font-style: italic; padding: 10px; background-color: #fff9c4; border-radius: 4px;")
+            self.action_layout.addWidget(nota)
+            self.action_layout.addSpacing(10)
+        
+        # Se houver outros sistemas além do EXPRESSO, mostrar formulário
+        if outros_sistemas:
+            self.action_layout.addWidget(QLabel("<b>Preencha as credenciais para cada sistema:</b>"))
+
+            cred_scroll = QScrollArea()
+            cred_scroll.setWidgetResizable(True)
+            cred_scroll.setStyleSheet("background-color: #C4CFED; border: none;")
+            cred_widget = QWidget()
+            cred_layout = QVBoxLayout(cred_widget)
+            cred_layout.setSpacing(15)
+
+            sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip()]
+            
+            for sistema in sistemas:
+                # Skip EXPRESSO
+                if sistema.strip().upper() == 'EXPRESSO':
+                    continue
+                
+                # Frame para cada sistema
+                system_frame = QFrame()
+                system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
+                system_layout = QGridLayout(system_frame)
+                system_layout.setSpacing(8)
+                
+                # Título do sistema
+                title = QLabel(f"<b>{sistema}</b>")
+                system_layout.addWidget(title, 0, 0, 1, 2)
+                
+                # Login
+                lbl_login = QLabel("Login:")
+                txt_login = QLineEdit()
+                txt_login.setPlaceholderText(f"Login para {sistema}")
+                txt_login.setStyleSheet("background-color: #f9f9f9; padding: 5px;")
+                system_layout.addWidget(lbl_login, 1, 0)
+                system_layout.addWidget(txt_login, 1, 1)
+                
+                # Senha
+                lbl_senha = QLabel("Senha:")
+                txt_senha = QLineEdit()
+                txt_senha.setPlaceholderText(f"Senha para {sistema}")
+                txt_senha.setEchoMode(QLineEdit.Password)
+                txt_senha.setStyleSheet("background-color: #f9f9f9; padding: 5px;")
+                system_layout.addWidget(lbl_senha, 2, 0)
+                system_layout.addWidget(txt_senha, 2, 1)
+                
+                # Mostrar/Ocultar Senha
+                btn_show = QPushButton("Mostrar")
+                btn_show.setMaximumWidth(80)
+                btn_show.setStyleSheet("padding: 3px; font-size: 10px;")
+                
+                def toggle_senha(txt_field, btn):
+                    if txt_field.echoMode() == QLineEdit.Password:
+                        txt_field.setEchoMode(QLineEdit.Normal)
+                        btn.setText("Ocultar")
+                    else:
+                        txt_field.setEchoMode(QLineEdit.Password)
+                        btn.setText("Mostrar")
+                
+                btn_show.clicked.connect(lambda checked=False, tf=txt_senha, btn=btn_show: toggle_senha(tf, btn))
+                system_layout.addWidget(btn_show, 2, 2)
+                
+                cred_layout.addWidget(system_frame)
+                self.credential_inputs[sistema] = (txt_login, txt_senha)
+            
+            cred_layout.addStretch()
+            cred_scroll.setWidget(cred_widget)
+            self.action_layout.addWidget(cred_scroll)
+        else:
+            # Se só tiver EXPRESSO
+            aviso = QLabel("<b>Aviso:</b> Esta solicitação é apenas para EXPRESSO. Nenhuma credencial adicional precisa ser preenchida aqui.")
+            aviso.setStyleSheet("padding: 15px; background-color: #e3f2fd; border: 1px solid #2196F3; border-radius: 4px; color: #1565c0;")
+            aviso.setWordWrap(True)
+            self.action_layout.addWidget(aviso)
 
         btn_finish = QPushButton("Finalizar Solicitação"); btn_finish.setObjectName("SubmitBtn")
         btn_finish.clicked.connect(self.finalizar_atendimento)
@@ -230,19 +286,74 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def build_readonly_ui(self, solicitacao):
         info = f"<b>Responsável:</b> {solicitacao.nome_suporte}<br><b>Início:</b> {solicitacao.data_inicio_atendimento} | <b>Fim:</b> {solicitacao.data_fechamento}<br><br>"
+        lbl = QLabel(info); lbl.setWordWrap(True); lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.action_layout.addWidget(lbl)
         
-        credenciais_html = "<b>Credenciais Criadas:</b><br><div style='background-color:#e8f4f8; padding:10px; border-radius:4px; border:1px solid #add8e6; color: #333;'>"
+        # para expresso note
+        is_expresso = False
+        try:
+            if 'EXPRESSO' in solicitacao.sistemas_solicitados.upper():
+                is_expresso = True
+                note_lbl = QLabel("<i>A senha provisória será enviada para o email fornecido pelo usuário.</i>")
+                note_lbl.setStyleSheet("color: #555; font-style: italic;")
+                self.action_layout.addWidget(note_lbl)
+                self.action_layout.addSpacing(10)
+        except Exception:
+            pass
+        
+        # Mostrar credenciais separadas por sistema (filter out expresso later)
+        self.action_layout.addWidget(QLabel("<b>Credenciais Criadas:</b>"))
+        
+        cred_scroll = QScrollArea()
+        cred_scroll.setWidgetResizable(True)
+        cred_scroll.setStyleSheet("background-color: #C4CFED; border: none;")
+        cred_widget = QWidget()
+        cred_layout = QVBoxLayout(cred_widget)
+        cred_layout.setSpacing(10)
+        
         try:
             credenciais_data = json.loads(solicitacao.credenciais_criadas)
             for sistema, cred in credenciais_data.items():
-                credenciais_html += f"<b>{sistema}:</b> {cred}<br>"
+                # skip expresso entry
+                if sistema.strip().upper() == 'EXPRESSO':
+                    continue
+                # Parsear "login|senha"
+                if '|' in cred:
+                    login, senha = cred.split('|', 1)
+                else:
+                    login, senha = cred, "***"
+                
+                # Frame para cada sistema
+                system_frame = QFrame()
+                system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
+                system_layout = QVBoxLayout(system_frame)
+                system_layout.setSpacing(5)
+                
+                # Título
+                title = QLabel(f"<b>{sistema}</b>")
+                system_layout.addWidget(title)
+                
+                # Login (copiável)
+                login_label = QLabel(f"<b>Login:</b> <span style='font-family: monospace; background-color: #f5f5f5; padding: 2px 5px;'>{login}</span>")
+                login_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                system_layout.addWidget(login_label)
+                
+                # Senha (copiável)
+                senha_label = QLabel(f"<b>Senha:</b> <span style='font-family: monospace; background-color: #f5f5f5; padding: 2px 5px;'>{senha}</span>")
+                senha_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                system_layout.addWidget(senha_label)
+                
+                cred_layout.addWidget(system_frame)
         except (json.JSONDecodeError, TypeError):
-            credenciais_html += solicitacao.credenciais_criadas if solicitacao.credenciais_criadas else "N/A"
-        credenciais_html += "</div>"
+            # Se não conseguir parsear JSON, mostrar como texto
+            cred_label = QLabel(solicitacao.credenciais_criadas or "N/A")
+            cred_label.setWordWrap(True)
+            cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            cred_layout.addWidget(cred_label)
         
-        info += credenciais_html
-        lbl = QLabel(info); lbl.setWordWrap(True); lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.action_layout.addWidget(lbl)
+        cred_layout.addStretch()
+        cred_scroll.setWidget(cred_widget)
+        self.action_layout.addWidget(cred_scroll)
 
     def iniciar_atendimento(self):
         try: 
@@ -253,12 +364,19 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def finalizar_atendimento(self):
         try:
-            credentials_data = {sistema: line_edit.text() for sistema, line_edit in self.credential_inputs.items()}
+            # Montar credenciais a partir dos campos de login e senha separados
+            credentials_data = {}
+            for sistema, (txt_login, txt_senha) in self.credential_inputs.items():
+                login = txt_login.text().strip()
+                senha = txt_senha.text().strip()
+                
+                if not login or not senha:
+                    QMessageBox.warning(self, "Atenção", f"Por favor, preencha login e senha para o sistema '{sistema}'.")
+                    return
+                
+                # Salvar no formato "login|senha"
+                credentials_data[sistema] = f"{login}|{senha}"
             
-            if not all(credentials_data.values()):
-                QMessageBox.warning(self, "Atenção", "Por favor, preencha as credenciais para todos os sistemas solicitados.")
-                return
-
             json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4)
             self.controller.finalizar_solicitacao(self.solicitacao_id, self.user_suporte.id, json_data)
             QMessageBox.information(self, "Sucesso", "Solicitação finalizada!")

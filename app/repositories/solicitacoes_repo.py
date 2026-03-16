@@ -47,7 +47,7 @@ class SolicitacaoContaRepository:
     def assumir_atendimento(self, solicitacao_id: int, suporte_id: int):
         session = self.session_factory()
         try:
-            solicitacao = session.query(SolicitacaoConta).get(solicitacao_id)
+            solicitacao = session.get(SolicitacaoConta, solicitacao_id)
             if solicitacao:
                 solicitacao.status = "Em andamento"
                 solicitacao.suporte_id = suporte_id
@@ -62,7 +62,7 @@ class SolicitacaoContaRepository:
     def finalizar_atendimento(self, solicitacao_id: int, credenciais: str):
         session = self.session_factory()
         try:
-            solicitacao = session.query(SolicitacaoConta).get(solicitacao_id)
+            solicitacao = session.get(SolicitacaoConta, solicitacao_id)
             if solicitacao:
                 solicitacao.status = "Resolvido"
                 solicitacao.credenciais_criadas = credenciais
@@ -85,6 +85,18 @@ class SolicitacaoContaRepository:
                 SolicitacaoConta.status.in_(['Aberto', 'Em andamento'])
             ).first()
             return solicitacao_ativa is not None
+        finally:
+            session.close()
+
+    def tem_resolvido_pendente_por_usuario(self, usuario_id: int) -> bool:
+        """Retorna True se o usuário possuir ao menos uma solicitação com status 'Resolvido' (aguardando confirmação)."""
+        session = self.session_factory()
+        try:
+            count = session.query(SolicitacaoConta).filter(
+                SolicitacaoConta.usuario_id == usuario_id,
+                SolicitacaoConta.status == 'Resolvido'
+            ).count()
+            return count > 0
         finally:
             session.close()
 

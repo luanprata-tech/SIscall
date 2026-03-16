@@ -3,8 +3,10 @@ class SolicitacaoContaController:
         self.solicitacao_repo = repo
 
     def criar_solicitacao(self, usuario_id, descricao, sistemas):
-        if self.solicitacao_repo.tem_solicitacao_ativa_por_usuario(usuario_id):
-            raise ValueError("Você já possui uma solicitação de criação de conta em andamento. Aguarde a finalização para solicitar novamente.")
+        # Nova regra: permite múltiplas solicitações, mas bloqueia se houver
+        # alguma solicitação com status 'Resolvido' aguardando confirmação pelo usuário.
+        if hasattr(self.solicitacao_repo, 'tem_resolvido_pendente_por_usuario') and self.solicitacao_repo.tem_resolvido_pendente_por_usuario(usuario_id):
+            raise ValueError("Você possui solicitações resolvidas aguardando confirmação. Confirme o fechamento antes de abrir novas solicitações.")
         
         if not sistemas:
             raise ValueError("Selecione pelo menos um sistema.")

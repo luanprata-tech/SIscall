@@ -32,6 +32,7 @@ print(">>> Importando módulos...", flush=True)
 try:
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer  
+    from PySide6.QtGui import QIcon
     from app.core.database import DatabaseManager
     from app.repositories import UsuarioRepository, ChamadoRepository, SolicitacaoContaRepository
     from app.controllers import AuthController, ChamadoController, SolicitacaoContaController
@@ -44,6 +45,20 @@ class SistemaChamadosApp:
     def __init__(self):
         print(">>> Inicializando QApplication...", flush=True)
         self.app = QApplication(sys.argv)
+        # Define ícone da aplicação (suporta executável empacotado)
+        def resource_path(relative_path: str) -> str:
+            if getattr(sys, 'frozen', False):
+                base_path = getattr(sys, '_MEIPASS', os.path.abspath('.'))
+            else:
+                base_path = os.path.abspath('.')
+            return os.path.join(base_path, relative_path)
+
+        icon_path = resource_path('assets/icon.ico')
+        try:
+            if os.path.exists(icon_path):
+                self.app.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
         self.app.setStyleSheet(STYLESHEET)
         
         # 1. Configuração do Banco
