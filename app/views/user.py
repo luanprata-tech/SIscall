@@ -475,7 +475,16 @@ class UserWindow(QMainWindow):
             QMessageBox.warning(self, "Erro", str(e))
 
     def deletar_chamado(self, item_id, item_type):
-        confirm = QMessageBox.question(self, "Confirmar", "Excluir?", QMessageBox.Yes | QMessageBox.No)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Confirmar Exclusão")
+        msg_box.setText("Tem certeza que deseja excluir este item?")
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.button(QMessageBox.Yes).setText("Sim, excluir")
+        msg_box.button(QMessageBox.No).setText("Não")
+        msg_box.setDefaultButton(QMessageBox.No)
+        confirm = msg_box.exec()
+
         if confirm == QMessageBox.Yes:
             try:
                 if item_type == 'chamado':
@@ -486,9 +495,16 @@ class UserWindow(QMainWindow):
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def confirmar_fechamento(self, item_id, item_type, dialog=None):
-        confirm = QMessageBox.question(self, "Confirmar Resolução", 
-                                       "Você confirma que a solicitação foi atendida? Esta ação fechará o item permanentemente.",
-                                       QMessageBox.Yes | QMessageBox.No)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Confirmar Resolução")
+        msg_box.setText("Você confirma que a solicitação foi atendida? Esta ação fechará o item permanentemente.")
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.button(QMessageBox.Yes).setText("Sim, confirmo")
+        msg_box.button(QMessageBox.No).setText("Não")
+        msg_box.setDefaultButton(QMessageBox.No)
+        confirm = msg_box.exec()
+
         if confirm == QMessageBox.Yes:
             try:
                 if item_type == 'chamado':

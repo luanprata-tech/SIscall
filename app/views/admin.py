@@ -356,11 +356,18 @@ class AdminWindow(QMainWindow):
         self.load_users()
 
     def excluir_usuario(self, user_id):
-        confirm = QMessageBox.question(self, "Desativar Usuário",
-                                         "Tem certeza que deseja desativar este usuário?"
-                                         ,QMessageBox.Yes | QMessageBox.No)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Desativar Usuário")
+        msg_box.setText("Tem certeza que deseja desativar este usuário?")
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg_box.button(QMessageBox.Yes).setText("Sim")
+        msg_box.button(QMessageBox.No).setText("Não")
+        msg_box.setDefaultButton(QMessageBox.No)
+        confirm = msg_box.exec()
+
         if confirm == QMessageBox.Yes:
-            try: self.auth_controller.excluir_usuario(user_id); self.load_users() # Este método agora desativa
+            try: self.auth_controller.excluir_usuario(user_id); self.load_users()
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def prev_page_historico(self):
