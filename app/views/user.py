@@ -161,7 +161,7 @@ class UserWindow(QMainWindow):
         self.contas_label.setVisible(False)
         
         self.checkboxes_contas = {}
-        sistemas = ["IGESP","EXPRESSO","REDE","SGI","SISGERI","SISCALL"]
+        sistemas = ["IGESP","EXPRESSO/E-DOC","REDE","SGI","SISGERI","LABWIN","SISCALL"]
         
         for sistema in sistemas:
             cb = QCheckBox(sistema)

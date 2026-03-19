@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QGridLayout
 )
 from PySide6.QtCore import Qt
-from .common import CenterMixin
+from .common import CenterMixin, LISTA_SETORES
 import json
 
 # --- DIALOGO DE EDIÇÃO DE USUÁRIO (ADMIN) ---
@@ -36,7 +36,7 @@ class UserEditDialog(QDialog, CenterMixin):
         # SETOR
         layout.addWidget(QLabel("<b>Setor:</b>"))
         self.combo_setor = QComboBox()
-        self.combo_setor.addItems(["AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
+        self.combo_setor.addItems(LISTA_SETORES)
         self.combo_setor.setCurrentText(self.user.setor)
         layout.addWidget(self.combo_setor)
         
@@ -97,7 +97,8 @@ class UserRegisterDialog(QDialog, CenterMixin):
 
         layout.addWidget(QLabel("Setor:"))
         self.combo_setor = QComboBox()
-        self.combo_setor.addItems(["Selecione seu Setor","AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
+        itens_setor = ["Selecione seu Setor"] + LISTA_SETORES
+        self.combo_setor.addItems(itens_setor)
         layout.addWidget(self.combo_setor)
 
         layout.addWidget(QLabel("Cargo:"))

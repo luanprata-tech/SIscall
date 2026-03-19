@@ -75,6 +75,23 @@ QComboBox QAbstractItemView {
     border: 1px solid #ccc; outline: none;
 }
 
+/* Checkbox Customizado */
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}
+QCheckBox::indicator:hover {
+    border: 1px solid #458BD2;
+}
+QCheckBox::indicator:checked {
+    background-color: #458BD2;
+    border: 1px solid #458BD2;
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>');
+}
+
 /* Cards de Relatório */
 QGroupBox {
     background-color: white; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px; font-weight: bold; color: #2c3e50;
@@ -97,3 +114,12 @@ class CenterMixin:
         if not getattr(self, '_centered', False):
             QTimer.singleShot(10, self.force_center)
             self._centered = True
+
+# --- CONSTANTES COMPARTILHADAS ---
+LISTA_SETORES = sorted([
+    "AGEPLAN", "AGEQUALI", "ARRECADAÇÂO", "ASCOM", "AUDITORIO", "COMEL", 
+    "CONSEGER", "COTRANSP", "CPI", "DIRAF", "DITEC", "FISCAIS", "GEAAD", 
+    "GEATEC", "GECONF", "GEINFORM", "GEMETRO", "GEREMETRO", "GERH", 
+    "GUARITA", "LABAGUA", "LABMICRO", "LABORG", "LABROMO", "LABSOLOS", 
+    "LEI", "OUVIDORIA", "PRE-MEDIDOS", "PRESIDENCIA", "PROJUR", "PROTOCOLO"
+])

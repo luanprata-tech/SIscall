@@ -8,6 +8,8 @@ class AuthController:
         self.sessao_usuario = None
 
     def login(self, user_login, password_plain):
+        # IMPORTANTE: O método `buscar_por_login` no repositório agora deve
+        # buscar apenas usuários com `ativo=True` para esta lógica funcionar.
         usuario = self.repo.buscar_por_login(user_login)
         if usuario:
             pass_hash = hashlib.sha256(password_plain.encode()).hexdigest()
@@ -21,6 +23,8 @@ class AuthController:
             raise ValueError("Preencha todos os campos obrigatórios.")
         if not setor or setor == "Selecione seu Setor":
             raise ValueError("Por favor, selecione um setor válido.")
+        # IMPORTANTE: O método `buscar_por_login` no repositório agora deve
+        # buscar apenas usuários com `ativo=True` para esta lógica funcionar.
         
         nome_completo = f"{nome} {sobrenome}".strip()
         if self.repo.buscar_por_login(login):
@@ -33,8 +37,8 @@ class AuthController:
             raise ValueError("Erro ao criar usuário.")
 
     # --- MÉTODOS ADMIN ---
-    def listar_usuarios(self, termo="", setor="Todos"):
-        return self.repo.buscar_filtrado(termo, setor)
+    def listar_usuarios(self, termo="", setor="Todos", incluir_inativos=False):
+        return self.repo.buscar_filtrado(termo, setor, incluir_inativos)
 
     def atualizar_setor(self, user_id, novo_setor):
         self.repo.atualizar_setor(user_id, novo_setor)
@@ -56,8 +60,10 @@ class AuthController:
 
     def excluir_usuario(self, user_id):
         if self.sessao_usuario and self.sessao_usuario.id == user_id:
-            raise ValueError("Você não pode excluir seu próprio usuário logado.")
-        self.repo.excluir(user_id)
+            raise ValueError("Você não pode desativar seu próprio usuário logado.")
+        # A lógica de "excluir" agora é uma desativação (soft delete),
+        # implementada no novo método `desativar` do repositório.
+        self.repo.desativar(user_id)
 
     def alterar_senha_definitiva(self, user_id, nova_senha):
         if len(nova_senha) < 4:

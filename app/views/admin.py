@@ -4,24 +4,24 @@ import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QAbstractItemView, QMessageBox, QDialog, 
-    QScrollArea, QFrame, QDateEdit, QGroupBox, QGridLayout, 
+    QHeaderView, QAbstractItemView, QMessageBox, QDialog, QScrollArea, 
+    QFrame, QDateEdit, QGroupBox, QGridLayout, QCheckBox,
     QLineEdit, QComboBox
 )
 from PySide6.QtCore import Qt, QTimer, QDate
 from PySide6.QtGui import QIcon, QFont, QColor
 from datetime import datetime
+from .common import LISTA_SETORES
 from .dialogs import TicketActionDialog, UserEditDialog, UserRegisterDialog, AccountRequestActionDialog
 
 # --- ADMIN WINDOW (MAXIMIZADO + RELATÓRIOS + GESTÃO) ---
 class AdminWindow(QMainWindow): 
-    def __init__(self, user, chamado_controller, logout_callback):
+    def __init__(self, user, chamado_controller, auth_controller, solicitacao_controller, logout_callback):
         super().__init__()
         self.user = user
         self.controller = chamado_controller
-        # Inicializa referências que podem ser injetadas após a criação
-        self.auth_controller = None
-        self.solicitacao_controller = None
+        self.auth_controller = auth_controller
+        self.solicitacao_controller = solicitacao_controller
         self.logout_callback = logout_callback
         # Definir ícone da janela (usa assets/icon.ico e suporta PyInstaller)
         try:
@@ -37,7 +37,7 @@ class AdminWindow(QMainWindow):
                 self.setWindowIcon(QIcon(icon_path))
         except Exception:
             pass
-        self.setWindowTitle("Gestão de Chamados - Admin")
+        self.setWindowTitle(f"Painel Admin - {user.nome}")
 
         self.items_per_page = 20
         self.current_page_historico = 1
@@ -49,12 +49,6 @@ class AdminWindow(QMainWindow):
         self.timer.timeout.connect(self.refresh_data)
         self.timer.start(1000) 
         self.refresh_data()
-
-    def set_auth_controller(self, auth_controller):
-        self.auth_controller = auth_controller
-
-    def set_solicitacao_controller(self, solicitacao_controller):
-        self.solicitacao_controller = solicitacao_controller
 
     def setup_ui(self):
         main_widget = QWidget()
@@ -252,16 +246,25 @@ class AdminWindow(QMainWindow):
         header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin: 15px 5px;")
         layout.addWidget(header)
         filter_layout = QHBoxLayout()
-        self.txt_search_user = QLineEdit(); self.txt_search_user.setPlaceholderText("Buscar por Nome ou Login...")
+        self.txt_search_user = QLineEdit()
+        self.txt_search_user.setPlaceholderText("Buscar por Nome ou Login...")
         self.txt_search_user.textChanged.connect(self.load_users)
-        self.combo_filter_setor = QComboBox(); self.combo_filter_setor.addItems(["Todos","AGEPLAN","AGEQUALI","ARRECADAÇÃO","ASCOM","AUDITORIO","CMCTS","CPI","COAPE","COMEL","CONSELHO","COPREM","COSERGER","COTRANSP","DIRAF","DITEC","GEAAD","GEATEC","GECONF","GEINFORM","GEMETRO","GEREMETRO","GEPROCON","GEQPROC","GERH","GPRESI","GUARITA","LABAGUA","LABROMATOLOGIA","LEI","LABMICROBIOLOGIA","LABORG","LABSOLOS","OUVIDORIA","PROJUR","PROTOCOLO","SAC"])
+        self.combo_filter_setor = QComboBox()
+        self.combo_filter_setor.addItems(["Todos"] + LISTA_SETORES)
         self.combo_filter_setor.currentTextChanged.connect(self.load_users)
         
+        self.check_incluir_inativos = QCheckBox("Ver inativos")
+        self.check_incluir_inativos.stateChanged.connect(self.load_users)
+
         btn_new_user = QPushButton("Novo Usuário")
         btn_new_user.setIcon(QIcon.fromTheme("contact-new"))
         btn_new_user.clicked.connect(self.abrir_cadastro_usuario)
         
-        filter_layout.addWidget(self.txt_search_user); filter_layout.addWidget(self.combo_filter_setor); filter_layout.addWidget(btn_new_user)
+        filter_layout.addWidget(self.txt_search_user, 1)
+        filter_layout.addWidget(self.combo_filter_setor)
+        filter_layout.addStretch()
+        filter_layout.addWidget(self.check_incluir_inativos)
+        filter_layout.addWidget(btn_new_user)
         layout.addLayout(filter_layout)
         
         self.table_users = QTableWidget()
@@ -299,25 +302,46 @@ class AdminWindow(QMainWindow):
 
     def load_users(self):
         if not hasattr(self, 'auth_controller'): return
-        termo = self.txt_search_user.text(); setor = self.combo_filter_setor.currentText()
-        usuarios = self.auth_controller.listar_usuarios(termo, setor)
+        termo = self.txt_search_user.text()
+        setor = self.combo_filter_setor.currentText()
+        incluir_inativos = self.check_incluir_inativos.isChecked()
+        usuarios = self.auth_controller.listar_usuarios(termo, setor, incluir_inativos)
         self.table_users.setRowCount(len(usuarios))
         for i, u in enumerate(usuarios):
-            if u.tipo == 1:
-                nome_display = u.nome + " (Admin)"
-            elif u.tipo == 2:
-                nome_display = u.nome + " (Responsável)"
-            else:
-                nome_display = u.nome
-            self.table_users.setItem(i, 0, QTableWidgetItem(nome_display))
-            self.table_users.setItem(i, 1, QTableWidgetItem(u.login))
-            self.table_users.setItem(i, 2, QTableWidgetItem(u.setor or "-"))
+            is_active = getattr(u, 'ativo', True)
+
+            # Coluna Nome
+            nome_display = u.nome
+            if u.tipo == 1: nome_display += " (Admin)"
+            elif u.tipo == 2: nome_display += ""
+            elif u.tipo == 3: nome_display += " (Responsável)"
+            if not is_active: nome_display += " (Inativo)"
+            nome_item = QTableWidgetItem(nome_display)
+
+            # Colunas Login e Setor
+            login_item = QTableWidgetItem(u.login)
+            setor_item = QTableWidgetItem(u.setor or "-")
+
+            if not is_active:
+                gray_color = QColor("gray")
+                nome_item.setForeground(gray_color)
+                login_item.setForeground(gray_color)
+                setor_item.setForeground(gray_color)
+
+            self.table_users.setItem(i, 0, nome_item)
+            self.table_users.setItem(i, 1, login_item)
+            self.table_users.setItem(i, 2, setor_item)
             
             btn_edit = QPushButton("Editar"); btn_edit.setFixedSize(90, 36)
             btn_edit.clicked.connect(lambda _, user=u: self.editar_usuario(user))
             btn_del = QPushButton("Excluir"); btn_del.setObjectName("Danger"); btn_del.setFixedSize(90, 36)
             btn_del.clicked.connect(lambda _, uid=u.id: self.excluir_usuario(uid))
             
+            # Desabilitar ações para usuários inativos
+            if not is_active:
+                btn_edit.setEnabled(False)
+                btn_del.setEnabled(False)
+
             container = QWidget(); l = QHBoxLayout(container); l.setContentsMargins(2,2,2,2)
             l.addWidget(btn_edit); l.addWidget(btn_del); self.table_users.setCellWidget(i, 3, container)
 
@@ -332,14 +356,11 @@ class AdminWindow(QMainWindow):
         self.load_users()
 
     def excluir_usuario(self, user_id):
-        confirm = QMessageBox.question(
-            self,
-            "Desativar Usuário",
-            "Deseja desativar este usuário? Ele não aparecerá mais na gestão, mas permanecerá no banco de dados para manter o histórico.",
-            QMessageBox.Yes | QMessageBox.No
-        )
+        confirm = QMessageBox.question(self, "Desativar Usuário",
+                                         "Tem certeza que deseja desativar este usuário?"
+                                         ,QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
-            try: self.auth_controller.excluir_usuario(user_id); self.load_users()
+            try: self.auth_controller.excluir_usuario(user_id); self.load_users() # Este método agora desativa
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def prev_page_historico(self):

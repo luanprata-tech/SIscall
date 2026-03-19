@@ -106,11 +106,8 @@ class SistemaChamadosApp:
         try:
             print(f">>> Login sucesso: {user.nome} ({user.tipo})")
             if user.tipo == 1:
-                # Admin
-                new_window = AdminWindow(user, self.chamado_controller, self.logout)
-                # INJEÇÃO DE DEPENDÊNCIAS EXTRAS PARA ADMIN
-                new_window.set_auth_controller(self.auth_controller)
-                new_window.set_solicitacao_controller(self.solicitacao_controller)
+                # Admin - Passa todos os controllers diretamente no construtor
+                new_window = AdminWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.logout)
             else:
                 # Comum
                 new_window = UserWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.logout)

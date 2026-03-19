@@ -132,8 +132,8 @@ class DatabaseManager:
             session.close()
             return
 
-        senha_admin = hashlib.sha256("admin123".encode()).hexdigest()
-        senha_user = hashlib.sha256("user123".encode()).hexdigest()
+        senha_admin = hashlib.sha256("1234".encode()).hexdigest()
+        senha_user = hashlib.sha256("1234".encode()).hexdigest()
 
         admin = Usuario(nome="Administrador", login="admin", senha=senha_admin, tipo=1, setor="TI - Infraestrutura")
         user = Usuario(nome="Usuário Teste", login="user", senha=senha_user, tipo=0, setor="Comercial")

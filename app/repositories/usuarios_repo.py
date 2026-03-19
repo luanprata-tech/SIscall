@@ -52,11 +52,15 @@ class UsuarioRepository:
         finally:
             session.close()
 
-    def buscar_filtrado(self, termo: str, filtro_setor: str = None) -> List[Usuario]:
+    def buscar_filtrado(self, termo: str, filtro_setor: str = None, incluir_inativos: bool = False) -> List[Usuario]:
         session = self.session_factory()
         try:
-            # Exibe apenas usuários ativos na gestão
-            query = session.query(Usuario).filter(Usuario.ativo == True)
+            query = session.query(Usuario)
+
+            # Por padrão, busca apenas usuários ativos
+            if not incluir_inativos:
+                query = query.filter(Usuario.ativo == True)
+
             if termo:
                 t = f"%{termo}%"
                 query = query.filter(or_(Usuario.nome.like(t), Usuario.login.like(t)))
@@ -120,13 +124,15 @@ class UsuarioRepository:
         finally:
             session.close()
 
-    def excluir(self, user_id: int):
+    def desativar(self, user_id: int):
         session = self.session_factory()
         try:
-            u = session.get(Usuario, user_id)
-            if u:
-                # Soft delete: marca como inativo para não quebrar relações FK existentes
-                u.ativo = False
+            usuario = session.query(Usuario).filter_by(id=user_id).first()
+            if usuario:
+                # Libera o login, tornando-o único para o registro desativado
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                usuario.login = f"{usuario.login}_inativo_{timestamp}"
+                usuario.ativo = False
                 session.commit()
         except:
             session.rollback()

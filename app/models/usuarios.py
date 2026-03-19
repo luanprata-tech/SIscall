@@ -11,6 +11,7 @@ class Usuario(Base):
     senha = Column(String, nullable=False)
     tipo = Column(Integer, nullable=False)  # 0 = Comum, 1 = Admin
     setor = Column(String, nullable=True)
+    ativo = Column(Boolean, default=True, nullable=False)
     
     # Flag para forçar troca de senha no próximo login
     trocar_senha = Column(Boolean, default=False)
