@@ -14,7 +14,7 @@ class Chamado(Base):
     data_fechamento = Column(String, nullable=True)
     
     descricao = Column(String)
-    maquina = Column(String, nullable=True)
+    maquina = Column(String)
     
     status = Column(String, default="Aberto")
     diagnostico = Column(String, nullable=True)

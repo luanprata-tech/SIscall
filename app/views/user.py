@@ -138,7 +138,7 @@ class UserWindow(QMainWindow):
         self.combo_machine = QComboBox()
         # Adiciona itens com label (visível) e value (armazenado) separados.
         machines = [
-            ("Selecione aqui", ""),
+            ("Selecione aqui", "Selecione aqui"),
             ("COMPUTADOR", "COMPUTADOR"),
             ("NOTEBOOK", "NOTEBOOK"),
             ("IMPRESSORA", "IMPRESSORA"),
@@ -460,6 +460,10 @@ class UserWindow(QMainWindow):
                     raise ValueError("Para uma solicitação de acesso, selecione pelo menos um sistema!")
                 self.solicitacao_controller.criar_solicitacao(self.user.id, descricao, contas_selecionadas)
                 QMessageBox.information(self, "Sucesso", "Solicitação de acesso registrada!")
+            
+            elif maquina == 'Selecione aqui':
+                raise ValueError("Selecione uma máquina/dispositivo")
+            
             else:
                 self.controller.criar_chamado(self.user.id, descricao, maquina)            
                 QMessageBox.information(self, "Sucesso", "Chamado registrado!")
