@@ -138,6 +138,7 @@ class UserWindow(QMainWindow):
         self.combo_machine = QComboBox()
         # Adiciona itens com label (visível) e value (armazenado) separados.
         machines = [
+            ("Selecione aqui", ""),
             ("COMPUTADOR", "COMPUTADOR"),
             ("NOTEBOOK", "NOTEBOOK"),
             ("IMPRESSORA", "IMPRESSORA"),
