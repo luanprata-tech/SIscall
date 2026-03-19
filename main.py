@@ -30,8 +30,8 @@ elif sys.platform == "linux":
 
 print(">>> Importando módulos...", flush=True)
 try:
-    from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer  
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtCore import QTimer
     from PySide6.QtGui import QIcon
     from app.core.database import DatabaseManager
     from app.repositories import UsuarioRepository, ChamadoRepository, SolicitacaoContaRepository
@@ -44,6 +44,9 @@ except ImportError as e:
 class SistemaChamadosApp:
     def __init__(self):
         print(">>> Inicializando QApplication...", flush=True)
+        # A flag self.is_initialized controla se a aplicação pode rodar.
+        # Se a conexão com o banco falhar, ela permanecerá False.
+        self.is_initialized = False
         self.app = QApplication(sys.argv)
         # Define ícone da aplicação (suporta executável empacotado)
         def resource_path(relative_path: str) -> str:
@@ -64,14 +67,21 @@ class SistemaChamadosApp:
         # 1. Configuração do Banco
         print(">>> Configurando banco de dados...", flush=True)
         try:
-            # Sem passar connection_string, ele lerá de variáveis de ambiente
-            # Veja o arquivo .env na raiz do projeto para configurar
             self.db_manager = DatabaseManager()
             self.db_manager.setup()
             print(">>> Banco configurado com sucesso.", flush=True)
         except Exception as e:
             print(f"ERRO NO BANCO: {e}")
-            raise e
+            # Se a conexão com o banco de dados falhar, exibe uma janela de erro.
+            # A aplicação não continuará a inicialização.
+            error_dialog = QMessageBox()
+            error_dialog.setIcon(QMessageBox.Critical)
+            error_dialog.setWindowTitle("Sistema Indisponível")
+            error_dialog.setText("Não foi possível conectar ao Siscall.")
+            error_dialog.setInformativeText("Tente novamente mais tarde ou contate o suporte.")
+            error_dialog.setStandardButtons(QMessageBox.Ok)
+            error_dialog.exec()
+            return # Interrompe a inicialização
 
         # 2. Repositórios e Controladores
         print(">>> Inicializando controladores...", flush=True)
@@ -88,6 +98,9 @@ class SistemaChamadosApp:
         self.current_window = None
         print(">>> Abrindo janela de login...", flush=True)
         self.show_login()
+
+        # Se a inicialização chegou até aqui, está tudo OK.
+        self.is_initialized = True
 
     def show_login(self):
         # Abre nova janela antes de fechar a antiga
@@ -130,6 +143,10 @@ class SistemaChamadosApp:
         QTimer.singleShot(0, self.show_login)
 
     def run(self):
+        # Se a inicialização falhou (ex: erro de banco), não executa o app.
+        if not self.is_initialized:
+            return 1 # Retorna um código de erro
+
         print(">>> Entrando no loop de eventos...", flush=True)
         return self.app.exec()
 

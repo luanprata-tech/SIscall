@@ -76,6 +76,9 @@ QComboBox QAbstractItemView {
 }
 
 /* Checkbox Customizado */
+QCheckBox {
+    color: black;
+}
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
