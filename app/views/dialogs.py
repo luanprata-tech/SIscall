@@ -1,12 +1,14 @@
 # views/dialogs.py
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QComboBox, QPushButton, 
+    QDialog, QVBoxLayout, QLabel, QComboBox, QPushButton, QFileDialog,
     QLineEdit, QMessageBox, QScrollArea, QWidget, QFrame, QPlainTextEdit,
     QGridLayout
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QPixmap
 from .common import CenterMixin, LISTA_SETORES
 import json
+import os
 
 # --- DIALOGO DE EDIÇÃO DE USUÁRIO (ADMIN) ---
 class UserEditDialog(QDialog, CenterMixin):
@@ -415,8 +417,16 @@ class TicketActionDialog(QDialog, CenterMixin):
         self.lbl_info.setStyleSheet("font-size: 15px; line-height: 1.5; color: #333;")
         self.lbl_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_info.setWordWrap(True)
-        self.details_layout.addWidget(self.lbl_info)
-        self.details_layout.addSpacing(10)
+        self.details_layout.addWidget(self.lbl_info)        
+
+        # Container para a imagem, para que possamos limpá-lo e recriá-lo
+        self.image_container = QWidget()
+        self.image_layout = QVBoxLayout(self.image_container)
+        self.image_layout.setContentsMargins(0, 0, 0, 0)
+        self.details_layout.addWidget(self.image_container)
+
+        self.details_layout.addStretch()
+
         scroll.setWidget(scroll_content)
         self.layout.addWidget(scroll)
         self.action_frame = QFrame()
@@ -439,6 +449,47 @@ class TicketActionDialog(QDialog, CenterMixin):
         """
         
         self.lbl_info.setText(info_text)
+
+        # Limpa o container da imagem anterior
+        while self.image_layout.count():
+            child = self.image_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        # Adiciona a imagem se existir
+        if c.imagem_data:
+            img_frame = QFrame()
+            img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px; margin-top: 10px;")
+            img_layout_inner = QVBoxLayout(img_frame)
+            
+            img_title = QLabel("<b>Imagem Anexada:</b>")
+            img_layout_inner.addWidget(img_title)
+
+            pixmap = QPixmap()
+            pixmap.loadFromData(c.imagem_data)
+            lbl_img = QLabel()
+            lbl_img.setPixmap(pixmap.scaledToWidth(500, Qt.SmoothTransformation))
+            lbl_img.setAlignment(Qt.AlignCenter)
+            img_layout_inner.addWidget(lbl_img)
+            
+            btn_save_img = QPushButton("Salvar Imagem...")
+            btn_save_img.setObjectName("Link")
+
+            # 'self' aqui é o QDialog, então pode ser usado como parent
+            def save_image(data=c.imagem_data, filename=getattr(c, 'imagem_filename', 'imagem.png')):
+                filePath, _ = QFileDialog.getSaveFileName(self, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
+                if filePath:
+                    try:
+                        with open(filePath, 'wb') as f:
+                            f.write(data)
+                        QMessageBox.information(self, "Sucesso", "Imagem salva com sucesso!")
+                    except Exception as e:
+                        QMessageBox.warning(self, "Erro", f"Não foi possível salvar a imagem: {e}")
+
+            btn_save_img.clicked.connect(save_image)
+            img_layout_inner.addWidget(btn_save_img, 0, Qt.AlignCenter)
+            self.image_layout.addWidget(img_frame)
+
         while self.action_layout.count():
             child = self.action_layout.takeAt(0)
             if child.widget(): child.widget().deleteLater()

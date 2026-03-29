@@ -4,7 +4,7 @@ from sqlalchemy import or_, func, case, desc
 from sqlalchemy.exc import IntegrityError
 from app.models import Usuario, Chamado
 from datetime import datetime
-
+import os
 
 
 class ChamadoRepository:
@@ -35,15 +35,29 @@ class ChamadoRepository:
         finally:
             session.close()
 
-    def criar(self, usuario_id: int, descricao: str, maquina: str):
+    def criar(self, usuario_id: int, descricao: str, maquina: str, imagem_path: Optional[str] = None):
         session = self.session_factory()
+        
+        image_data = None
+        image_filename = None
+        if imagem_path and os.path.exists(imagem_path):
+            try:
+                with open(imagem_path, 'rb') as f:
+                    image_data = f.read()
+                image_filename = os.path.basename(imagem_path)
+            except Exception as e:
+                print(f"AVISO: Falha ao ler o arquivo de imagem. O chamado será criado sem ela. Erro: {e}")
+                image_data = None
+                image_filename = None
         try:
             novo_chamado = Chamado(
                 usuario_id=usuario_id,
                 descricao=descricao,
                 maquina=maquina,
                 data_abertura=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                status="Aberto"
+                status="Aberto",
+                imagem_data=image_data,
+                imagem_filename=image_filename
             )
             session.add(novo_chamado)
             session.commit()

@@ -4,12 +4,12 @@ import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QAbstractItemView, QMessageBox, QDialog, QScrollArea, 
+    QHeaderView, QAbstractItemView, QMessageBox, QDialog, QScrollArea, QFileDialog,
     QFrame, QDateEdit, QGroupBox, QGridLayout, QCheckBox,
     QLineEdit, QComboBox
 )
 from PySide6.QtCore import Qt, QTimer, QDate
-from PySide6.QtGui import QIcon, QFont, QColor
+from PySide6.QtGui import QIcon, QFont, QColor, QPixmap, QDesktopServices
 from datetime import datetime
 from .common import LISTA_SETORES
 from .dialogs import TicketActionDialog, UserEditDialog, UserRegisterDialog, AccountRequestActionDialog
@@ -603,6 +603,41 @@ class AdminWindow(QMainWindow):
             lbl_desc.setWordWrap(True)
             lbl_desc.setStyleSheet("background-color:#f5f5f5; padding:10px; border-radius:4px; border:1px solid #ddd;")
             scroll_layout.addWidget(lbl_desc)
+            scroll_layout.addSpacing(15)
+            
+            # --- MOSTRAR IMAGEM ANEXADA (LIDA DO BANCO) ---
+            if hasattr(chamado, 'imagem_data') and chamado.imagem_data:
+                img_frame = QFrame()
+                img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;")
+                img_layout = QVBoxLayout(img_frame)
+                
+                img_title = QLabel("<b>Imagem Anexada:</b>")
+                img_layout.addWidget(img_title)
+
+                pixmap = QPixmap()
+                pixmap.loadFromData(chamado.imagem_data)
+                lbl_img = QLabel()
+                lbl_img.setPixmap(pixmap.scaledToWidth(500, Qt.SmoothTransformation))
+                lbl_img.setAlignment(Qt.AlignCenter)
+                img_layout.addWidget(lbl_img)
+                
+                btn_save_img = QPushButton("Salvar Imagem...")
+                btn_save_img.setObjectName("Link")
+
+                def save_image(data=chamado.imagem_data, filename=getattr(chamado, 'imagem_filename', 'imagem.png')):
+                    filePath, _ = QFileDialog.getSaveFileName(dialog, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
+                    if filePath:
+                        try:
+                            with open(filePath, 'wb') as f:
+                                f.write(data)
+                            QMessageBox.information(dialog, "Sucesso", "Imagem salva com sucesso!")
+                        except Exception as e:
+                            QMessageBox.warning(dialog, "Erro", f"Não foi possível salvar a imagem: {e}")
+                
+                btn_save_img.clicked.connect(save_image)
+                img_layout.addWidget(btn_save_img, 0, Qt.AlignCenter)
+                
+                scroll_layout.addWidget(img_frame)
             scroll_layout.addSpacing(15)
             
             dates_card = QFrame()
