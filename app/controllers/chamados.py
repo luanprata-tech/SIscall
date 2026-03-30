@@ -6,7 +6,7 @@ class ChamadoController:
     def __init__(self, repo):
         self.repo = repo
 
-    def criar_chamado(self, usuario_id, descricao, maquina):
+    def criar_chamado(self, usuario_id, descricao, maquina, imagem_path=None):
         # Nova regra: permite múltiplos chamados, mas bloqueia enquanto houver
         # algum chamado do usuário com status 'Resolvido' (aguardando confirmação).
         if hasattr(self.repo, 'tem_resolvido_pendente_por_usuario') and self.repo.tem_resolvido_pendente_por_usuario(usuario_id):
@@ -16,7 +16,7 @@ class ChamadoController:
             raise ValueError("Descrição não pode estar vazia.")
         if not maquina or maquina == "Selecione a Máquina":
              raise ValueError("Selecione qual máquina está com problema.")
-        self.repo.criar(usuario_id, descricao, maquina)
+        self.repo.criar(usuario_id, descricao, maquina, imagem_path=imagem_path)
     
     def excluir_chamado(self, chamado_id):
         chamado = self.repo.buscar_por_id(chamado_id)

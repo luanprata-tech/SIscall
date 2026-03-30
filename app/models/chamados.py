@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, LargeBinary
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -15,6 +15,8 @@ class Chamado(Base):
     
     descricao = Column(String)
     maquina = Column(String)
+    imagem_data = Column(LargeBinary, nullable=True) # Armazena os bytes da imagem
+    imagem_filename = Column(String, nullable=True) # Armazena o nome original do arquivo
     
     status = Column(String, default="Aberto")
     diagnostico = Column(String, nullable=True)

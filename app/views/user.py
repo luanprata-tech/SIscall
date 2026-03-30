@@ -2,13 +2,13 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QComboBox, QCheckBox, 
-    QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QMessageBox, QDialog, QScrollArea, QLineEdit
+    QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
+    QAbstractItemView, QMessageBox, QDialog, QScrollArea, QLineEdit, QFileDialog
 )
 import os
 import sys
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QFont, QColor
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QIcon, QFont, QColor, QPixmap, QDesktopServices
 from datetime import datetime
 import json
 
@@ -40,6 +40,7 @@ class UserWindow(QMainWindow):
         self.items_per_page = 15
         self.current_page_meus_chamados = 1
         self.total_pages_meus_chamados = 1
+        self.selected_image_path = None
 
         
         self.setup_ui()
@@ -183,6 +184,20 @@ class UserWindow(QMainWindow):
         self.txt_desc.setStyleSheet("border: 1px solid #ccc; background-color: white; color: #333;")
         form_layout.addWidget(self.txt_desc)
 
+        # --- Anexo de Imagem ---
+        attach_layout = QHBoxLayout()
+        self.btn_attach = QPushButton("Anexar Imagem")
+        self.btn_attach.setObjectName("Secondary")
+        self.btn_attach.setFixedSize(150, 36)
+        self.btn_attach.clicked.connect(self.select_image)
+        self.lbl_attachment = QLabel("Nenhum arquivo selecionado.")
+        self.lbl_attachment.setStyleSheet("color: #555; font-style: italic;")
+        attach_layout.addWidget(self.btn_attach)
+        attach_layout.addWidget(self.lbl_attachment)
+        attach_layout.addStretch()
+        form_layout.addLayout(attach_layout)
+        # --- Fim Anexo ---
+
         btn_submit = QPushButton("Enviar Solicitação")
         btn_submit.setMinimumHeight(45)
         btn_submit.setObjectName("SubmitBtn")
@@ -193,6 +208,12 @@ class UserWindow(QMainWindow):
         layout.addWidget(form_frame)
         layout.addStretch()
         return widget
+
+    def select_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg *.bmp)")
+        if file_path:
+            self.selected_image_path = file_path
+            self.lbl_attachment.setText(os.path.basename(file_path))
 
     def on_machine_changed(self):
         # Verifica pelo valor associado (userData). Para a opção de contas,
@@ -216,6 +237,14 @@ class UserWindow(QMainWindow):
         if not is_conta:
             for cb in self.checkboxes_contas.values():
                 cb.setChecked(False)
+        
+        # Habilita/desabilita anexo de imagem
+        can_attach = not is_conta
+        self.btn_attach.setVisible(can_attach)
+        self.lbl_attachment.setVisible(can_attach)
+        if not can_attach:
+            self.selected_image_path = None
+            self.lbl_attachment.setText("Nenhum arquivo selecionado.")
 
     def create_my_tickets_page(self):
         widget = QWidget()
@@ -466,13 +495,17 @@ class UserWindow(QMainWindow):
                 raise ValueError("Selecione uma máquina/dispositivo")
             
             else:
-                self.controller.criar_chamado(self.user.id, descricao, maquina)            
+                # Passa o caminho da imagem selecionada para o controller
+                self.controller.criar_chamado(self.user.id, descricao, maquina, imagem_path=self.selected_image_path)
                 QMessageBox.information(self, "Sucesso", "Chamado registrado!")
 
             self.txt_desc.clear()
             self.combo_machine.setCurrentIndex(0)
             for cb in self.checkboxes_contas.values():
                 cb.setChecked(False)
+            # Limpa o anexo após o envio
+            self.selected_image_path = None
+            self.lbl_attachment.setText("Nenhum arquivo selecionado.")
             self.switch_page(1)
         except ValueError as e:
             QMessageBox.warning(self, "Atenção", str(e))
@@ -557,6 +590,41 @@ class UserWindow(QMainWindow):
                 lbl_desc.setWordWrap(True)
                 lbl_desc.setStyleSheet("background-color:#f5f5f5; padding:10px; border-radius:4px;")
                 scroll_layout.addWidget(lbl_desc)
+                scroll_layout.addSpacing(15)
+
+                # --- MOSTRAR IMAGEM ANEXADA (LIDA DO BANCO) ---
+                if hasattr(item, 'imagem_data') and item.imagem_data:
+                    img_frame = QFrame()
+                    img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;")
+                    img_layout = QVBoxLayout(img_frame)
+                    
+                    img_title = QLabel("<b>Imagem Anexada:</b>")
+                    img_layout.addWidget(img_title)
+
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(item.imagem_data)
+                    lbl_img = QLabel()
+                    lbl_img.setPixmap(pixmap.scaledToWidth(600, Qt.SmoothTransformation))
+                    lbl_img.setAlignment(Qt.AlignCenter)
+                    img_layout.addWidget(lbl_img)
+                    
+                    btn_save_img = QPushButton("Salvar Imagem...")
+                    btn_save_img.setObjectName("Link")
+
+                    def save_image(data=item.imagem_data, filename=getattr(item, 'imagem_filename', 'imagem.png')):
+                        filePath, _ = QFileDialog.getSaveFileName(dialog, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
+                        if filePath:
+                            try:
+                                with open(filePath, 'wb') as f:
+                                    f.write(data)
+                                QMessageBox.information(dialog, "Sucesso", "Imagem salva com sucesso!")
+                            except Exception as e:
+                                QMessageBox.warning(dialog, "Erro", f"Não foi possível salvar a imagem: {e}")
+                    
+                    btn_save_img.clicked.connect(save_image)
+                    img_layout.addWidget(btn_save_img, 0, Qt.AlignCenter)
+                    
+                    scroll_layout.addWidget(img_frame)
                 scroll_layout.addSpacing(15)
                 
                 if hasattr(item, 'diagnostico') and item.diagnostico:
