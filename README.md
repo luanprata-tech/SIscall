@@ -62,3 +62,7 @@ A documentação completa do projeto está na pasta `docs/`. Recomendamos a leit
 Se for a primeira execução (banco vazio), o sistema criará um usuário administrador padrão:
 - **Login:** `admin`
 - **Senha:** `admin123`
+
+## Comando do executavel
+uv run  PyInstaller --noconfirm --clean --name SisCall --onedir --windowed --icon "assets\icon.ico" --add-data ".env;.config" --add-data "assets;assets" --distpath
+"dist" --workpath "build" "main.py"

@@ -145,6 +145,7 @@ class UserWindow(QMainWindow):
             ("TELEFONE", "TELEFONE"),
             ("INTERNET", "INTERNET"),
             ("SCANNER", "SCANNER"),
+            ("SISTEMA", "SISTEMA"),
             ("Liberação de usuários para acesso ao sistema", "Solicitação de acesso"),
             ("Outro Dispositivo", "Outro Dispositivo")
         ]
