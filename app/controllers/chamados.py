@@ -32,6 +32,38 @@ class ChamadoController:
             raise ValueError(f"Este chamado já está sendo atendido por {chamado.nome_suporte}.")
         self.repo.assumir_atendimento(chamado_id, suporte_id)
 
+    def marcar_em_espera(self, chamado_id, suporte_id):
+        chamado = self.repo.buscar_por_id(chamado_id)
+        if not chamado:
+            raise ValueError("Chamado não encontrado.")
+        if chamado.status != "Em andamento":
+            raise ValueError("Apenas chamados 'Em andamento' podem ser marcados como em espera.")
+        if chamado.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode marcar como em espera.")
+        self.repo.marcar_em_espera(chamado_id)
+
+    def continuar_de_espera(self, chamado_id, suporte_id):
+        chamado = self.repo.buscar_por_id(chamado_id)
+        if not chamado:
+            raise ValueError("Chamado não encontrado.")
+        if chamado.status != "Em espera":
+            raise ValueError("Apenas chamados 'Em espera' podem ser continuados.")
+        if chamado.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode continuar o chamado.")
+        self.repo.continuar_de_espera(chamado_id)
+
+    def resolver_de_espera(self, chamado_id, suporte_id, diagnostico, solucao):
+        chamado = self.repo.buscar_por_id(chamado_id)
+        if not chamado:
+            raise ValueError("Chamado não encontrado.")
+        if chamado.status != "Em espera":
+            raise ValueError("Apenas chamados 'Em espera' podem ser resolvidos.")
+        if not diagnostico.strip() or not solucao.strip():
+            raise ValueError("É obrigatório descrever o Diagnóstico e a Solução.")
+        if chamado.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode resolver o chamado.")
+        self.repo.finalizar_atendimento(chamado_id, diagnostico, solucao)
+
     def resolver_chamado(self, chamado_id, suporte_id, diagnostico, solucao):
         chamado = self.repo.buscar_por_id(chamado_id)
         

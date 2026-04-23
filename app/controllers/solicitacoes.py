@@ -39,6 +39,36 @@ class SolicitacaoContaController:
         
         self.solicitacao_repo.finalizar_atendimento(solicitacao_id, credenciais)
 
+    def marcar_em_espera(self, solicitacao_id, suporte_id):
+        solicitacao = self.solicitacao_repo.buscar_por_id(solicitacao_id)
+        if not solicitacao:
+            raise ValueError("Solicitação não encontrada.")
+        if solicitacao.status != "Em andamento":
+            raise ValueError("Apenas solicitações 'Em andamento' podem ser marcadas como em espera.")
+        if solicitacao.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode marcar como em espera.")
+        self.solicitacao_repo.marcar_em_espera(solicitacao_id)
+
+    def continuar_de_espera(self, solicitacao_id, suporte_id):
+        solicitacao = self.solicitacao_repo.buscar_por_id(solicitacao_id)
+        if not solicitacao:
+            raise ValueError("Solicitação não encontrada.")
+        if solicitacao.status != "Em espera":
+            raise ValueError("Apenas solicitações 'Em espera' podem ser continuadas.")
+        if solicitacao.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode continuar a solicitação.")
+        self.solicitacao_repo.continuar_de_espera(solicitacao_id)
+
+    def resolver_de_espera(self, solicitacao_id, suporte_id, credenciais):
+        solicitacao = self.solicitacao_repo.buscar_por_id(solicitacao_id)
+        if not solicitacao:
+            raise ValueError("Solicitação não encontrada.")
+        if solicitacao.status != "Em espera":
+            raise ValueError("Apenas solicitações 'Em espera' podem ser resolvidas.")
+        if solicitacao.suporte_id != suporte_id:
+            raise ValueError("Apenas o suporte responsável pode resolver a solicitação.")
+        self.solicitacao_repo.finalizar_atendimento(solicitacao_id, credenciais)
+
     def excluir_solicitacao(self, solicitacao_id, usuario_id):
         solicitacao = self.solicitacao_repo.buscar_por_id(solicitacao_id)
         if not solicitacao:

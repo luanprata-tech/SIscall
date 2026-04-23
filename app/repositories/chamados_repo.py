@@ -82,6 +82,32 @@ class ChamadoRepository:
         finally:
             session.close()
 
+    def marcar_em_espera(self, chamado_id: int):
+        session = self.session_factory()
+        try:
+            chamado = session.get(Chamado, chamado_id)
+            if chamado:
+                chamado.status = "Em espera"
+                session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def continuar_de_espera(self, chamado_id: int):
+        session = self.session_factory()
+        try:
+            chamado = session.get(Chamado, chamado_id)
+            if chamado:
+                chamado.status = "Em andamento"
+                session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def finalizar_atendimento(self, chamado_id: int, diagnostico: str, solucao: str):
         session = self.session_factory()
         try:

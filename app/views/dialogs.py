@@ -2,13 +2,73 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QComboBox, QPushButton, QFileDialog,
     QLineEdit, QMessageBox, QScrollArea, QWidget, QFrame, QPlainTextEdit,
-    QGridLayout
+    QGridLayout, QHBoxLayout
 )
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QPixmap
 from .common import CenterMixin, LISTA_SETORES
 import json
 import os
+
+# --- DIALOG PARA VER IMAGEM EM TELA CHEIA ---
+class ImageViewDialog(QDialog, CenterMixin):
+    def __init__(self, image_data, filename=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Visualizar Imagem")
+        self.setStyleSheet("background-color: #fdfdfd;")
+        self.setup_ui(image_data, filename)
+
+    def setup_ui(self, image_data, filename):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Carrega a imagem
+        pixmap = QPixmap()
+        pixmap.loadFromData(image_data)
+        
+        # Calcula tamanho para manter proporção e não exceder 800x600
+        img_width = pixmap.width()
+        img_height = pixmap.height()
+        max_width, max_height = 1000, 700
+        
+        if img_width > max_width or img_height > max_height:
+            pixmap = pixmap.scaledToWidth(max_width, Qt.SmoothTransformation) if img_width > max_width else pixmap
+            if pixmap.height() > max_height:
+                pixmap = pixmap.scaledToHeight(max_height, Qt.SmoothTransformation)
+        
+        # Exibe a imagem
+        lbl_img = QLabel()
+        lbl_img.setPixmap(pixmap)
+        lbl_img.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl_img)
+        
+        # Botões
+        btn_layout = QHBoxLayout()
+        
+        btn_save = QPushButton("Salvar Imagem...")
+        btn_save.setObjectName("Info")
+        btn_save.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+        def save_image():
+            filePath, _ = QFileDialog.getSaveFileName(self, "Salvar Imagem Como...", filename or "imagem.png", "Imagens (*.png *.jpg *.jpeg)")
+            if filePath:
+                try:
+                    with open(filePath, 'wb') as f:
+                        f.write(image_data)
+                    QMessageBox.information(self, "Sucesso", "Imagem salva com sucesso!")
+                except Exception as e:
+                    QMessageBox.warning(self, "Erro", f"Não foi possível salvar a imagem: {e}")
+        btn_save.clicked.connect(save_image)
+        btn_layout.addWidget(btn_save)
+        
+        btn_close = QPushButton("Fechar")
+        btn_close.setObjectName("Info")
+        btn_close.setStyleSheet("background-color: #607D8B; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+        btn_close.clicked.connect(self.close)
+        btn_layout.addWidget(btn_close)
+        
+        layout.addLayout(btn_layout)
+        
+        self.setFixedSize(1050, 750)
 
 # --- DIALOGO DE EDIÇÃO DE USUÁRIO (ADMIN) ---
 class UserEditDialog(QDialog, CenterMixin):
@@ -146,7 +206,7 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
 
     def setup_ui(self):
         s = self.controller.buscar_por_id(self.solicitacao_id)
-        if s.status == "Em andamento": self.setFixedSize(900, 800)
+        if s.status == "Em andamento" or s.status == "Em espera": self.setFixedSize(1100, 900)
         elif s.status == "Aberto": self.setFixedSize(900,800)
         else: self.setFixedSize(600, 600)
         self.layout = QVBoxLayout(self)
@@ -172,7 +232,7 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         <h3 style='margin:0; color:#2c3e50;'>{s.nome_usuario}</h3>
         <span style='color:#7f8c8d;'>{s.setor_usuario}</span><br><br>
         <b>Aberto em:</b> {s.data_abertura}<br>
-        <b>Status:</b> <b style='font-size:16px; color:{'red' if s.status=='Aberto' else 'blue'}'>{s.status.upper()}</b><br>        
+        <b>Status:</b> <b style='font-size:16px; color:{'red' if s.status=='Aberto' else 'blue' if s.status=='Resolvido' else 'gray' if s.status=='Em espera' else 'green' if s.status=='Finalizado' else 'orange'}'>{s.status.upper()}</b><br>        
         """
         if s.descricao:
             info_text += f"<br><b>Usuário solicitante:</b><br><div style='background-color:#fff; padding:10px; border-radius:4px; border:1px solid #ddd; color: #333;'>{s.descricao}</div>"
@@ -186,6 +246,9 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         elif s.status == "Em andamento":
             if s.suporte_id == self.user_suporte.id: self.build_finish_ui(s)
             else: self.build_locked_ui(s)
+        elif s.status == "Em espera":
+            if s.suporte_id == self.user_suporte.id: self.build_wait_ui_solicitacao(s)
+            else: self.build_locked_ui(s)
         else: self.build_readonly_ui(s)
 
     def build_start_ui(self):
@@ -197,13 +260,22 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
     def build_finish_ui(self, solicitacao):
         self.credential_inputs.clear()
         
-        # Verificar se tem EXPRESSO
-        tem_expresso = 'EXPRESSO' in solicitacao.sistemas_solicitados.upper()
-        outros_sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip() and s.strip().upper() != 'EXPRESSO']
+        # Verificar se tem EXPRESSO/E-DOC
+        tem_expresso = 'EXPRESSO/E-DOC' in solicitacao.sistemas_solicitados.upper()
+        outros_sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip() and s.strip().upper() != 'EXPRESSO/E-DOC']
+        
+        # Botão para colocar em espera
+        btn_wait = QPushButton("Colocar em Espera")
+        btn_wait.setObjectName("WarningBtn")
+        btn_wait.clicked.connect(self.marcar_solicitacao_em_espera)
+        self.action_layout.addWidget(btn_wait)
+        self.action_layout.addSpacing(15)
+        
+        self.action_layout.addWidget(QLabel("<b>Ou finalize o atendimento:</b>"))
         
         # Se tiver EXPRESSO, mostrar nota
         if tem_expresso:
-            nota = QLabel("<i>Para EXPRESSO, a senha será enviada via email. Preencha as credenciais para os demais sistemas.</i>")
+            nota = QLabel("<i>Para EXPRESSO ou E-DOC, a senha será enviada via email. Preencha as credenciais para os demais sistemas.</i>")
             nota.setStyleSheet("color: #555; font-style: italic; padding: 10px; background-color: #fff9c4; border-radius: 4px;")
             self.action_layout.addWidget(nota)
             self.action_layout.addSpacing(10)
@@ -222,8 +294,8 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
             sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip()]
             
             for sistema in sistemas:
-                # Skip EXPRESSO
-                if sistema.strip().upper() == 'EXPRESSO':
+                # Skip EXPRESSO/E-DOC
+                if sistema.strip().upper() == 'EXPRESSO/E-DOC':
                     continue
                 
                 # Frame para cada sistema
@@ -286,6 +358,106 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         btn_finish.clicked.connect(self.finalizar_atendimento)
         self.action_layout.addWidget(btn_finish)
 
+    def build_wait_ui_solicitacao(self, solicitacao):
+        self.credential_inputs.clear()
+        
+        # Verificar se tem EXPRESSO/E-DOC
+        tem_expresso = 'EXPRESSO/E-DOC' in solicitacao.sistemas_solicitados.upper()
+        outros_sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip() and s.strip().upper() != 'EXPRESSO/E-DOC']
+        
+        btn_continue = QPushButton("Continuar Atendimento")
+        btn_continue.setObjectName("SubmitBtn")
+        btn_continue.clicked.connect(self.continuar_solicitacao_de_espera)
+        
+        self.action_layout.addWidget(btn_continue)
+        
+        self.action_layout.addWidget(QLabel("<b>Ou finalize o atendimento:</b>"))
+        
+        # Se tiver EXPRESSO, mostrar nota
+        if tem_expresso:
+            nota = QLabel("<i>Para EXPRESSO ou E-DOC, a senha será enviada via email. Preencha as credenciais para os demais sistemas.</i>")
+            nota.setStyleSheet("color: #555; font-style: italic; padding: 10px; background-color: #fff9c4; border-radius: 4px;")
+            self.action_layout.addWidget(nota)
+            self.action_layout.addSpacing(10)
+        
+        # Se houver outros sistemas além do EXPRESSO, mostrar formulário
+        if outros_sistemas:
+            self.action_layout.addWidget(QLabel("<b>Preencha as credenciais para cada sistema:</b>"))
+
+            cred_scroll = QScrollArea()
+            cred_scroll.setWidgetResizable(True)
+            cred_scroll.setStyleSheet("background-color: #C4CFED; border: none;")
+            cred_widget = QWidget()
+            cred_layout = QVBoxLayout(cred_widget)
+            cred_layout.setSpacing(15)
+
+            sistemas = [s.strip() for s in solicitacao.sistemas_solicitados.split(',') if s.strip()]
+            
+            for sistema in sistemas:
+                # Skip EXPRESSO/E-DOC
+                if sistema.strip().upper() == 'EXPRESSO/E-DOC':
+                    continue
+                
+                # Frame para cada sistema
+                system_frame = QFrame()
+                system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
+                system_layout = QGridLayout(system_frame)
+                system_layout.setSpacing(8)
+                
+                # Título do sistema
+                title = QLabel(f"<b>{sistema}</b>")
+                system_layout.addWidget(title, 0, 0, 1, 2)
+                
+                # Login
+                lbl_login = QLabel("Login:")
+                txt_login = QLineEdit()
+                txt_login.setPlaceholderText(f"Login para {sistema}")
+                txt_login.setStyleSheet("background-color: #f9f9f9; padding: 5px;")
+                system_layout.addWidget(lbl_login, 1, 0)
+                system_layout.addWidget(txt_login, 1, 1)
+                
+                # Senha
+                lbl_senha = QLabel("Senha:")
+                txt_senha = QLineEdit()
+                txt_senha.setPlaceholderText(f"Senha para {sistema}")
+                txt_senha.setEchoMode(QLineEdit.Password)
+                txt_senha.setStyleSheet("background-color: #f9f9f9; padding: 5px;")
+                system_layout.addWidget(lbl_senha, 2, 0)
+                system_layout.addWidget(txt_senha, 2, 1)
+                
+                # Mostrar/Ocultar Senha
+                btn_show = QPushButton("Mostrar")
+                btn_show.setMaximumWidth(80)
+                btn_show.setStyleSheet("padding: 3px; font-size: 10px;")
+                
+                def toggle_senha(txt_field, btn):
+                    if txt_field.echoMode() == QLineEdit.Password:
+                        txt_field.setEchoMode(QLineEdit.Normal)
+                        btn.setText("Ocultar")
+                    else:
+                        txt_field.setEchoMode(QLineEdit.Password)
+                        btn.setText("Mostrar")
+                
+                btn_show.clicked.connect(lambda checked=False, tf=txt_senha, btn=btn_show: toggle_senha(tf, btn))
+                system_layout.addWidget(btn_show, 2, 2)
+                
+                cred_layout.addWidget(system_frame)
+                self.credential_inputs[sistema] = (txt_login, txt_senha)
+            
+            cred_layout.addStretch()
+            cred_scroll.setWidget(cred_widget)
+            self.action_layout.addWidget(cred_scroll)
+        else:
+            # Se só tiver EXPRESSO
+            aviso = QLabel("<b>Aviso:</b> Esta solicitação é apenas para EXPRESSO. Nenhuma credencial adicional precisa ser preenchida aqui.")
+            aviso.setStyleSheet("padding: 15px; background-color: #e3f2fd; border: 1px solid #2196F3; border-radius: 4px; color: #1565c0;")
+            aviso.setWordWrap(True)
+            self.action_layout.addWidget(aviso)
+
+        btn_finish = QPushButton("Finalizar Solicitação"); btn_finish.setObjectName("SubmitBtn")
+        btn_finish.clicked.connect(self.finalizar_de_espera_solicitacao)
+        self.action_layout.addWidget(btn_finish)
+
     def build_locked_ui(self, solicitacao):
         lbl = QLabel(f"Esta solicitação já está sendo atendida por <b>{solicitacao.nome_suporte}</b>.")
         self.action_layout.addWidget(lbl)
@@ -321,7 +493,7 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
             credenciais_data = json.loads(solicitacao.credenciais_criadas)
             for sistema, cred in credenciais_data.items():
                 # skip expresso entry
-                if sistema.strip().upper() == 'EXPRESSO':
+                if sistema.strip().upper() == 'EXPRESSO/E-DOC':
                     continue
                 # Parsear "login|senha"
                 if '|' in cred:
@@ -368,6 +540,44 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
             self.load_solicitacao()
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
+    def marcar_solicitacao_em_espera(self):
+        try:
+            self.controller.marcar_em_espera(self.solicitacao_id, self.user_suporte.id)
+            QMessageBox.information(self, "Sucesso", "Solicitação marcada como em espera!")
+            self.load_solicitacao()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
+
+    def continuar_solicitacao_de_espera(self):
+        try:
+            self.controller.continuar_de_espera(self.solicitacao_id, self.user_suporte.id)
+            QMessageBox.information(self, "Sucesso", "Solicitação retomada! Status agora é em andamento.")
+            self.load_solicitacao()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
+
+    def finalizar_de_espera_solicitacao(self):
+        try:
+            # Montar credenciais a partir dos campos de login e senha separados
+            credentials_data = {}
+            for sistema, (txt_login, txt_senha) in self.credential_inputs.items():
+                login = txt_login.text().strip()
+                senha = txt_senha.text().strip()
+                
+                if not login or not senha:
+                    QMessageBox.warning(self, "Atenção", f"Por favor, preencha login e senha para o sistema '{sistema}'.")
+                    return
+                
+                # Salvar no formato "login|senha"
+                credentials_data[sistema] = f"{login}|{senha}"
+            
+            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4)
+            self.controller.resolver_de_espera(self.solicitacao_id, self.user_suporte.id, json_data)
+            QMessageBox.information(self, "Sucesso", "Solicitação finalizada!")
+            self.accept()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
+
     def finalizar_atendimento(self):
         try:
             # Montar credenciais a partir dos campos de login e senha separados
@@ -404,7 +614,8 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def setup_ui(self):
         c = self.controller.buscar_por_id(self.chamado_id)
-        if c.status == "Aberto": self.setFixedSize(600,500)
+        if c.status == "Em andamento" or c.status == "Em espera": self.setFixedSize(950, 780)
+        elif c.status == "Aberto": self.setFixedSize(600,500)
         else: self.setFixedSize(600,700)
         self.layout = QVBoxLayout(self)
         scroll = QScrollArea()
@@ -442,7 +653,7 @@ class TicketActionDialog(QDialog, CenterMixin):
         <span style='color:#7f8c8d;'>{c.setor_usuario}</span><br><br>
         <b>Máquina:</b> {c.maquina}<br>
         <b>Aberto em:</b> {c.data_abertura}<br>
-        <b>Status:</b> <b style='font-size:16px; color:{'red' if c.status=='Aberto' else 'blue'}'>{c.status.upper()}</b><br>
+        <b>Status:</b> <b style='font-size:16px; color:{'red' if c.status=='Aberto' else 'blue' if c.status=='Resolvido' else 'gray' if c.status=='Em espera' else 'green' if c.status=='Finalizado' else 'orange'}'>{c.status.upper()}</b><br>
         <hr>
         <b>Descrição:</b><br>
         <div style='background-color:#fff; padding:10px; border-radius:4px; border:1px solid #ddd; color: #333;'>{c.descricao}</div>
@@ -456,39 +667,13 @@ class TicketActionDialog(QDialog, CenterMixin):
             if child.widget():
                 child.widget().deleteLater()
 
-        # Adiciona a imagem se existir
+        # Adiciona botão para ver imagem se existir
         if c.imagem_data:
-            img_frame = QFrame()
-            img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px; margin-top: 10px;")
-            img_layout_inner = QVBoxLayout(img_frame)
-            
-            img_title = QLabel("<b>Imagem Anexada:</b>")
-            img_layout_inner.addWidget(img_title)
-
-            pixmap = QPixmap()
-            pixmap.loadFromData(c.imagem_data)
-            lbl_img = QLabel()
-            lbl_img.setPixmap(pixmap.scaledToWidth(500, Qt.SmoothTransformation))
-            lbl_img.setAlignment(Qt.AlignCenter)
-            img_layout_inner.addWidget(lbl_img)
-            
-            btn_save_img = QPushButton("Salvar Imagem...")
-            btn_save_img.setObjectName("Link")
-
-            # 'self' aqui é o QDialog, então pode ser usado como parent
-            def save_image(data=c.imagem_data, filename=getattr(c, 'imagem_filename', 'imagem.png')):
-                filePath, _ = QFileDialog.getSaveFileName(self, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
-                if filePath:
-                    try:
-                        with open(filePath, 'wb') as f:
-                            f.write(data)
-                        QMessageBox.information(self, "Sucesso", "Imagem salva com sucesso!")
-                    except Exception as e:
-                        QMessageBox.warning(self, "Erro", f"Não foi possível salvar a imagem: {e}")
-
-            btn_save_img.clicked.connect(save_image)
-            img_layout_inner.addWidget(btn_save_img, 0, Qt.AlignCenter)
-            self.image_layout.addWidget(img_frame)
+            btn_view_img = QPushButton("🖼️ Ver Imagem Anexada")
+            btn_view_img.setObjectName("Info")
+            btn_view_img.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+            btn_view_img.clicked.connect(lambda: ImageViewDialog(c.imagem_data, getattr(c, 'imagem_filename', 'imagem.png'), self).exec())
+            self.image_layout.addWidget(btn_view_img)
 
         while self.action_layout.count():
             child = self.action_layout.takeAt(0)
@@ -496,6 +681,9 @@ class TicketActionDialog(QDialog, CenterMixin):
         if c.status == "Aberto": self.build_start_ui()
         elif c.status == "Em andamento":
             if c.suporte_id == self.user_suporte.id: self.build_finish_ui(c)
+            else: self.build_locked_ui(c)
+        elif c.status == "Em espera":
+            if c.suporte_id == self.user_suporte.id: self.build_wait_ui(c)
             else: self.build_locked_ui(c)
         else: self.build_readonly_ui(c)
 
@@ -509,18 +697,55 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def build_finish_ui(self, chamado):
         lbl = QLabel(f"<b>Em atendimento desde:</b> {chamado.data_inicio_atendimento}")
+        
+        # Botão para colocar em espera
+        btn_wait = QPushButton("Colocar em Espera")
+        btn_wait.setObjectName("WarningBtn")
+        btn_wait.clicked.connect(self.marcar_em_espera)
+        self.action_layout.addWidget(btn_wait)
+        
+        self.action_layout.addWidget(QLabel("<b>Ou finalize o atendimento:</b>"))
+        
         btn_finish = QPushButton("Marcar como Resolvido")
         btn_finish.setObjectName("SubmitBtn")
         btn_finish.clicked.connect(self.resolver_atendimento)
         
-        self.action_layout.addWidget(lbl)
+        self.txt_diag = QPlainTextEdit()
+        self.txt_diag.setPlaceholderText("Diagnóstico técnico...")
+        self.txt_diag.setStyleSheet("background-color: white; color: #333;")
+        self.txt_diag.setFixedHeight(80)
+        self.txt_solucao = QPlainTextEdit()
+        self.txt_solucao.setPlaceholderText("Solução aplicada...")
+        self.txt_solucao.setStyleSheet("background-color: white; color: #333;")
+        self.txt_solucao.setFixedHeight(80)
+        self.action_layout.addWidget(QLabel("Diagnóstico:"))
+        self.action_layout.addWidget(self.txt_diag)
+        self.action_layout.addWidget(QLabel("Solução:"))
+        self.action_layout.addWidget(self.txt_solucao)
+        
+        self.action_layout.addWidget(btn_finish)
+
+    def build_wait_ui(self, chamado):
+        btn_continue = QPushButton("Continuar Atendimento")
+        btn_continue.setObjectName("SubmitBtn")
+        btn_continue.clicked.connect(self.continuar_de_espera)
+        
+        self.action_layout.addWidget(btn_continue)
+        
+        self.action_layout.addWidget(QLabel("<b>Ou finalize o atendimento:</b>"))
+        
+        btn_finish = QPushButton("Marcar como Resolvido")
+        btn_finish.setObjectName("SubmitBtn")
+        btn_finish.clicked.connect(self.resolver_de_espera)
         
         self.txt_diag = QPlainTextEdit()
         self.txt_diag.setPlaceholderText("Diagnóstico técnico...")
         self.txt_diag.setStyleSheet("background-color: white; color: #333;")
+        self.txt_diag.setFixedHeight(80)
         self.txt_solucao = QPlainTextEdit()
         self.txt_solucao.setPlaceholderText("Solução aplicada...")
         self.txt_solucao.setStyleSheet("background-color: white; color: #333;")
+        self.txt_solucao.setFixedHeight(80)
         self.action_layout.addWidget(QLabel("Diagnóstico:"))
         self.action_layout.addWidget(self.txt_diag)
         self.action_layout.addWidget(QLabel("Solução:"))
@@ -543,6 +768,30 @@ class TicketActionDialog(QDialog, CenterMixin):
             QMessageBox.information(self, "Sucesso", "Chamado em execução!")
             self.load_chamado()
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
+
+    def marcar_em_espera(self):
+        try:
+            self.controller.marcar_em_espera(self.chamado_id, self.user_suporte.id)
+            QMessageBox.information(self, "Sucesso", "Chamado marcado como em espera!")
+            self.load_chamado()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
+
+    def continuar_de_espera(self):
+        try:
+            self.controller.continuar_de_espera(self.chamado_id, self.user_suporte.id)
+            QMessageBox.information(self, "Sucesso", "Chamado retomado! Status agora é em andamento.")
+            self.load_chamado()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
+
+    def resolver_de_espera(self):
+        try:
+            self.controller.resolver_de_espera(self.chamado_id, self.user_suporte.id, self.txt_diag.toPlainText(), self.txt_solucao.toPlainText())
+            QMessageBox.information(self, "Sucesso", "Chamado marcado como resolvido! Aguardando confirmação do usuário.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
 
     def resolver_atendimento(self):
         try:

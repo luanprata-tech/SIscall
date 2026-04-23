@@ -441,6 +441,7 @@ class UserWindow(QMainWindow):
             font = QFont(); font.setBold(True); status_item.setFont(font)
             
             if c.status == "Aberto": status_item.setForeground(QColor("#d32f2f"))
+            elif c.status == "Em espera": status_item.setForeground(QColor("#757575"))
             elif c.status == "Resolvido": status_item.setForeground(QColor("#2196F3"))
             elif c.status == "Finalizado": status_item.setForeground(QColor("#2E7D32"))
             else: status_item.setForeground(QColor("#F57C00"))

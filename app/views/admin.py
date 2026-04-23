@@ -479,6 +479,7 @@ class AdminWindow(QMainWindow):
             status_item = QTableWidgetItem(c.status); status_item.setTextAlignment(Qt.AlignCenter)
             font = QFont(); font.setBold(True); status_item.setFont(font)
             if c.status == "Aberto": status_item.setForeground(QColor("#d32f2f"))
+            elif c.status == "Em espera": status_item.setForeground(QColor("#757575"))
             elif c.status == "Resolvido": status_item.setForeground(QColor("#2196F3"))
             elif c.status == "Finalizado": status_item.setForeground(QColor("#2E7D32"))
             else: status_item.setForeground(QColor("#F57C00"))
@@ -487,12 +488,12 @@ class AdminWindow(QMainWindow):
             if edit_mode:
                 btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para caber textos longos
                 is_mine = (c.suporte_id == self.user.id)
-                is_locked = (c.status == "Em andamento" and not is_mine)
+                is_locked = ((c.status == "Em andamento" or c.status == "Em espera") and not is_mine)
                 if c.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
                 elif is_locked: btn.setText("Bloqueado"); btn.setEnabled(False)
                 elif c.status == "Resolvido": btn.setText("Detalhes"); btn.setObjectName("Info"); btn.setEnabled(True)
                 else: btn.setText("Continuar"); btn.setObjectName("SubmitBtn"); btn.setEnabled(True)
-                if not is_locked and c.status != 'Resolvido': btn.clicked.connect(lambda _, cid=c.id: self.abrir_atendimento(cid))
+                if not is_locked and c.status not in ['Resolvido', 'Finalizado']: btn.clicked.connect(lambda _, cid=c.id: self.abrir_atendimento(cid))
                 elif c.status == 'Resolvido': btn.clicked.connect(lambda _, cid=c.id, ctype='chamado': self.ver_detalhes_unificado_admin(cid, ctype))
                 
                 widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn)
@@ -545,17 +546,18 @@ class AdminWindow(QMainWindow):
             status_item = QTableWidgetItem(s.status); status_item.setTextAlignment(Qt.AlignCenter)
             font = QFont(); font.setBold(True); status_item.setFont(font)
             if s.status == "Aberto": status_item.setForeground(QColor("#d32f2f"))
+            elif s.status == "Em espera": status_item.setForeground(QColor("#757575"))
             else: status_item.setForeground(QColor("#F57C00"))
             table.setItem(i, 5, status_item)
 
             btn = QPushButton(); btn.setFixedSize(180, 36) # Aumentado para consistência e textos longos
             is_mine = (s.suporte_id == self.user.id)
-            is_locked = (s.status == "Em andamento" and not is_mine)
+            is_locked = ((s.status == "Em andamento" or s.status == "Em espera") and not is_mine)
             if s.status == "Aberto": btn.setText("Atender"); btn.setObjectName("Info"); btn.setEnabled(True)
             elif is_locked: btn.setText("Bloqueado"); btn.setEnabled(False)
             elif s.status == "Resolvido": btn.setText("Detalhes"); btn.setObjectName("Info"); btn.setEnabled(True)
             else: btn.setText("Continuar"); btn.setObjectName("SubmitBtn"); btn.setEnabled(True)
-            if not is_locked and s.status != 'Resolvido': btn.clicked.connect(lambda _, sid=s.id: self.abrir_atendimento_solicitacao(sid))
+            if not is_locked and s.status not in ['Resolvido', 'Finalizado']: btn.clicked.connect(lambda _, sid=s.id: self.abrir_atendimento_solicitacao(sid))
             elif s.status == 'Resolvido': btn.clicked.connect(lambda _, sid=s.id, stype='solicitacao': self.ver_detalhes_unificado_admin(sid, stype))
 
             widget = QWidget(); layout = QHBoxLayout(widget); layout.setContentsMargins(5, 5, 5, 5); layout.addWidget(btn)
@@ -605,40 +607,15 @@ class AdminWindow(QMainWindow):
             scroll_layout.addWidget(lbl_desc)
             scroll_layout.addSpacing(15)
             
-            # --- MOSTRAR IMAGEM ANEXADA (LIDA DO BANCO) ---
+            # --- BOTÃO PARA VER IMAGEM ANEXADA ---
             if hasattr(chamado, 'imagem_data') and chamado.imagem_data:
-                img_frame = QFrame()
-                img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;")
-                img_layout = QVBoxLayout(img_frame)
-                
-                img_title = QLabel("<b>Imagem Anexada:</b>")
-                img_layout.addWidget(img_title)
-
-                pixmap = QPixmap()
-                pixmap.loadFromData(chamado.imagem_data)
-                lbl_img = QLabel()
-                lbl_img.setPixmap(pixmap.scaledToWidth(500, Qt.SmoothTransformation))
-                lbl_img.setAlignment(Qt.AlignCenter)
-                img_layout.addWidget(lbl_img)
-                
-                btn_save_img = QPushButton("Salvar Imagem...")
-                btn_save_img.setObjectName("Link")
-
-                def save_image(data=chamado.imagem_data, filename=getattr(chamado, 'imagem_filename', 'imagem.png')):
-                    filePath, _ = QFileDialog.getSaveFileName(dialog, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
-                    if filePath:
-                        try:
-                            with open(filePath, 'wb') as f:
-                                f.write(data)
-                            QMessageBox.information(dialog, "Sucesso", "Imagem salva com sucesso!")
-                        except Exception as e:
-                            QMessageBox.warning(dialog, "Erro", f"Não foi possível salvar a imagem: {e}")
-                
-                btn_save_img.clicked.connect(save_image)
-                img_layout.addWidget(btn_save_img, 0, Qt.AlignCenter)
-                
-                scroll_layout.addWidget(img_frame)
-            scroll_layout.addSpacing(15)
+                from .dialogs import ImageViewDialog
+                btn_view_img = QPushButton("🖼️ Ver Imagem Anexada")
+                btn_view_img.setObjectName("Info")
+                btn_view_img.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+                btn_view_img.clicked.connect(lambda: ImageViewDialog(chamado.imagem_data, getattr(chamado, 'imagem_filename', 'imagem.png'), dialog).exec())
+                scroll_layout.addWidget(btn_view_img)
+                scroll_layout.addSpacing(15)
             
             dates_card = QFrame()
             dates_card.setStyleSheet("background-color: white; border: 1px solid #ddd; border-radius: 4px; padding: 10px;")

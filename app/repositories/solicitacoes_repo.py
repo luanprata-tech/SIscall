@@ -73,6 +73,32 @@ class SolicitacaoContaRepository:
         finally:
             session.close()
 
+    def marcar_em_espera(self, solicitacao_id: int):
+        session = self.session_factory()
+        try:
+            solicitacao = session.get(SolicitacaoConta, solicitacao_id)
+            if solicitacao:
+                solicitacao.status = "Em espera"
+                session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def continuar_de_espera(self, solicitacao_id: int):
+        session = self.session_factory()
+        try:
+            solicitacao = session.get(SolicitacaoConta, solicitacao_id)
+            if solicitacao:
+                solicitacao.status = "Em andamento"
+                session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def tem_solicitacao_ativa_por_usuario(self, usuario_id: int) -> bool:
         """
         Verifica se um usuário já possui uma solicitação de criação de conta
