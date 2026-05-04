@@ -15,6 +15,7 @@ class Chamado(Base):
     
     descricao = Column(String)
     maquina = Column(String)
+    setor_origem = Column(String, nullable=True)
     imagem_data = Column(LargeBinary, nullable=True) # Armazena os bytes da imagem
     imagem_filename = Column(String, nullable=True) # Armazena o nome original do arquivo
     
@@ -34,6 +35,8 @@ class Chamado(Base):
     
     @property
     def setor_usuario(self):
+        if self.setor_origem:
+            return self.setor_origem
         return self.usuario.setor if self.usuario and self.usuario.setor else "N/A"
         
     @property

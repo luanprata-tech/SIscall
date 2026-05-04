@@ -31,6 +31,7 @@ CREATE TABLE chamados (
     data_fechamento VARCHAR,
     descricao VARCHAR,
     maquina VARCHAR,
+    setor_origem VARCHAR,
     status VARCHAR DEFAULT 'Aberto',
     diagnostico VARCHAR,
     solucao VARCHAR,

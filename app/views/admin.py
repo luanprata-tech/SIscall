@@ -515,8 +515,11 @@ class AdminWindow(QMainWindow):
 
     def abrir_atendimento(self, chamado_id):
         self.timer.stop()
-        dialog = TicketActionDialog(chamado_id, self.controller, self.user, self)
-        dialog.exec()
+        reopen_dialog = True
+        while reopen_dialog:
+            dialog = TicketActionDialog(chamado_id, self.controller, self.user, self)
+            dialog.exec()
+            reopen_dialog = getattr(dialog, 'reopen_requested', False)
         self.timer.start(1000)
         self.refresh_data()
 
@@ -569,8 +572,11 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Erro", "Controlador de solicitações não inicializado.")
             self.timer.start(1000)
             return
-        dialog = AccountRequestActionDialog(solicitacao_id, self.solicitacao_controller, self.user, self)
-        dialog.exec()
+        reopen_dialog = True
+        while reopen_dialog:
+            dialog = AccountRequestActionDialog(solicitacao_id, self.solicitacao_controller, self.user, self)
+            dialog.exec()
+            reopen_dialog = getattr(dialog, 'reopen_requested', False)
         self.timer.start(1000)
         self.refresh_data()
 

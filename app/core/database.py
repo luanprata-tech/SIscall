@@ -102,6 +102,8 @@ class DatabaseManager:
     def setup(self):
         Base.metadata.create_all(self.engine)
         self._ensure_usuario_ativo_column()
+        self._ensure_chamado_setor_origem_column()
+        self._backfill_chamado_setor_origem()
         self._criar_dados_iniciais()
 
     def _ensure_usuario_ativo_column(self):
@@ -125,6 +127,38 @@ class DatabaseManager:
                 conn.execute(text('ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE NOT NULL'))
             else:
                 conn.execute(text('ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE'))
+
+    def _ensure_chamado_setor_origem_column(self):
+        """Garante que a coluna de setor de origem exista na tabela de chamados."""
+        inspector = inspect(self.engine)
+        if 'chamados' not in inspector.get_table_names():
+            return
+        cols = [c['name'] for c in inspector.get_columns('chamados')]
+        if 'setor_origem' in cols:
+            return
+
+        with self.engine.begin() as conn:
+            if self.engine.dialect.name == 'sqlite':
+                conn.execute(text('ALTER TABLE chamados ADD COLUMN setor_origem VARCHAR'))
+            else:
+                conn.execute(text('ALTER TABLE chamados ADD COLUMN setor_origem VARCHAR'))
+
+    def _backfill_chamado_setor_origem(self):
+        """Preenche setor_origem dos chamados antigos com o setor atual do usuário de origem."""
+        inspector = inspect(self.engine)
+        if 'chamados' not in inspector.get_table_names() or 'usuarios' not in inspector.get_table_names():
+            return
+
+        cols = [c['name'] for c in inspector.get_columns('chamados')]
+        if 'setor_origem' not in cols:
+            return
+
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                'UPDATE chamados '
+                'SET setor_origem = (SELECT setor FROM usuarios WHERE usuarios.id = chamados.usuario_id) '
+                'WHERE setor_origem IS NULL'
+            ))
 
     def _criar_dados_iniciais(self):
         session = self.Session()

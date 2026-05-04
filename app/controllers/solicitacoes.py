@@ -89,3 +89,7 @@ class SolicitacaoContaController:
             raise ValueError("Esta solicitação não pode ser fechada pois não foi resolvida pelo suporte.")
         
         self.solicitacao_repo.fechar_solicitacao(solicitacao_id)
+
+    def contar_em_aberto(self) -> int:
+        """Retorna o número de solicitações de acesso em aberto."""
+        return self.solicitacao_repo.contar_em_aberto()

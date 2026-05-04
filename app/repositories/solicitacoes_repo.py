@@ -174,3 +174,13 @@ class SolicitacaoContaRepository:
                 .order_by(SolicitacaoConta.data_abertura.desc()).all()
         finally:
             session.close()
+
+    def contar_em_aberto(self) -> int:
+        """Conta o número de solicitações com status 'Aberto'."""
+        session = self.session_factory()
+        try:
+            return session.query(SolicitacaoConta).filter(
+                SolicitacaoConta.status == 'Aberto'
+            ).count()
+        finally:
+            session.close()

@@ -31,8 +31,8 @@ elif sys.platform == "linux":
 try:
     from PySide6.QtWidgets import QApplication
     from app.core.database import DatabaseManager
-    from app.repositories import ChamadoRepository
-    from app.controllers import ChamadoController
+    from app.repositories import ChamadoRepository, SolicitacaoContaRepository
+    from app.controllers import ChamadoController, SolicitacaoContaController
     from app.views import DashboardWindow, STYLESHEET
 except ImportError as e:
     print(f"ERRO DE IMPORTAÇÃO: {e}")
@@ -50,13 +50,15 @@ class DashboardApp:
             self.db_manager.setup()
             session_factory = self.db_manager.get_session
             chamado_repo = ChamadoRepository(session_factory)
+            solicitacao_repo = SolicitacaoContaRepository(session_factory)
             self.chamado_controller = ChamadoController(chamado_repo)
+            self.solicitacao_controller = SolicitacaoContaController(solicitacao_repo)
         except Exception as e:
             print(f"ERRO AO CONECTAR AO BANCO: {e}")
             sys.exit(1)
 
         # Cria e exibe a janela do dashboard
-        self.window = DashboardWindow(self.chamado_controller)
+        self.window = DashboardWindow(self.chamado_controller, self.solicitacao_controller)
         self.window.show()
 
     def run(self):

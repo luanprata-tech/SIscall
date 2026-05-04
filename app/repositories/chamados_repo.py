@@ -35,7 +35,7 @@ class ChamadoRepository:
         finally:
             session.close()
 
-    def criar(self, usuario_id: int, descricao: str, maquina: str, imagem_path: Optional[str] = None):
+    def criar(self, usuario_id: int, descricao: str, maquina: str, imagem_path: Optional[str] = None, setor_origem: Optional[str] = None):
         session = self.session_factory()
         
         image_data = None
@@ -54,6 +54,7 @@ class ChamadoRepository:
                 usuario_id=usuario_id,
                 descricao=descricao,
                 maquina=maquina,
+                setor_origem=setor_origem,
                 data_abertura=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 status="Aberto",
                 imagem_data=image_data,
@@ -82,12 +83,13 @@ class ChamadoRepository:
         finally:
             session.close()
 
-    def marcar_em_espera(self, chamado_id: int):
+    def marcar_em_espera(self, chamado_id: int, motivo_espera: str = ""):
         session = self.session_factory()
         try:
             chamado = session.get(Chamado, chamado_id)
             if chamado:
                 chamado.status = "Em espera"
+                chamado.diagnostico = motivo_espera.strip() if motivo_espera else None
                 session.commit()
         except:
             session.rollback()
@@ -101,6 +103,7 @@ class ChamadoRepository:
             chamado = session.get(Chamado, chamado_id)
             if chamado:
                 chamado.status = "Em andamento"
+                chamado.diagnostico = None
                 session.commit()
         except:
             session.rollback()
@@ -221,10 +224,9 @@ class ChamadoRepository:
             filtro_data = Chamado.data_abertura.between(data_inicio, data_fim)
             
             # 1. Setor com mais chamados
-            top_setor = session.query(Usuario.setor, func.count(Chamado.id).label('total'))\
-                .join(Chamado, Chamado.usuario_id == Usuario.id)\
+            top_setor = session.query(func.coalesce(Chamado.setor_origem, 'N/A'), func.count(Chamado.id).label('total'))\
                 .filter(filtro_data)\
-                .group_by(Usuario.setor)\
+                .group_by(func.coalesce(Chamado.setor_origem, 'N/A'))\
                 .order_by(desc('total')).all()
 
             # 2. Máquina com mais problemas

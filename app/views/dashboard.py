@@ -1,7 +1,7 @@
 import os
 import sys
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel, QTableWidget, 
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
     QTableWidgetItem, QHeaderView, QAbstractItemView, QStyledItemDelegate,
     QFrame, QGridLayout
 )
@@ -28,10 +28,11 @@ class HighlightDelegate(QStyledItemDelegate):
         super().paint(painter, option, index)
 
 class DashboardWindow(QMainWindow):
-    def __init__(self, chamado_controller):
+    def __init__(self, chamado_controller, solicitacao_controller=None):
         super().__init__()
         self.controller = chamado_controller
-        self.setWindowTitle("Dashboard de Chamados Abertos")
+        self.solicitacao_controller = solicitacao_controller
+        self.setWindowTitle("Dashboard de Chamados Pendentes")
         self.setMinimumSize(1280, 720)
         self.setStyleSheet("background-color: #2c3e50;") # Tema escuro para a TV
 
@@ -67,10 +68,23 @@ class DashboardWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
 
-        header = QLabel("Chamados em Aberto")
-        header.setStyleSheet("font-size: 32px; font-weight: bold; color: white; margin: 20px;")
+        # --- HEADER COM TÍTULO E INDICATIVO DE SOLICITAÇÕES ---
+        header_frame = QFrame()
+        header_layout = QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(20, 20, 20, 20)
+        
+        header = QLabel("Chamados Pendentes")
+        header.setStyleSheet("font-size: 32px; font-weight: bold; color: white;")
         header.setAlignment(Qt.AlignCenter)
-        layout.addWidget(header)
+        header_layout.addWidget(header, 1)
+        
+        # Indicativo discreto de solicitações em aberto
+        self.lbl_solicitacoes = QLabel("Solicitações: 0")
+        self.lbl_solicitacoes.setStyleSheet("font-size: 14px; color: #bdc3c7; background-color: #34495e; padding: 8px 15px; border-radius: 5px; border: 1px solid #458BD2;")
+        self.lbl_solicitacoes.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        header_layout.addWidget(self.lbl_solicitacoes)
+        
+        layout.addWidget(header_frame)
 
         # --- PAINEL DE DESTAQUE PARA O ÚLTIMO CHAMADO ---
         self.latest_ticket_frame = QFrame()
@@ -106,6 +120,7 @@ class DashboardWindow(QMainWindow):
         self.lbl_latest_usuario = QLabel("-")
         self.lbl_latest_maquina = QLabel("-")
         self.lbl_latest_horario = QLabel("-")
+        self.lbl_latest_status = QLabel("-")
         self.lbl_latest_descricao = QLabel("...")
         self.lbl_latest_descricao.setObjectName("LatestDesc")
         self.lbl_latest_descricao.setWordWrap(True)
@@ -118,7 +133,9 @@ class DashboardWindow(QMainWindow):
         latest_layout.addWidget(self.lbl_latest_maquina, 2, 1)
         latest_layout.addWidget(QLabel("<b>Horário:</b>"), 2, 2)
         latest_layout.addWidget(self.lbl_latest_horario, 2, 3)
-        latest_layout.addWidget(self.lbl_latest_descricao, 3, 0, 1, 4)
+        latest_layout.addWidget(QLabel("<b>Status:</b>"), 3, 0)
+        latest_layout.addWidget(self.lbl_latest_status, 3, 1)
+        latest_layout.addWidget(self.lbl_latest_descricao, 4, 0, 1, 4)
 
         latest_layout.setColumnStretch(1, 1)
         latest_layout.setColumnStretch(3, 1)
@@ -195,9 +212,17 @@ class DashboardWindow(QMainWindow):
 
     def refresh_data(self):
         try:
+            # Atualizar indicativo de solicitações em aberto
+            if self.solicitacao_controller:
+                try:
+                    count_solicitacoes = self.solicitacao_controller.contar_em_aberto()
+                    self.lbl_solicitacoes.setText(f"Solicitações: {count_solicitacoes}")
+                except Exception as e:
+                    print(f"Erro ao contar solicitações: {e}")
+            
             chamados = self.controller.listar_pendentes()
-            # Mostrar apenas chamados pendentes e em andamento (excluir 'Resolvido' e 'Finalizado')
-            chamados = [c for c in chamados if getattr(c, 'status', None) in ('Aberto', 'Em andamento')]
+            # Mostrar apenas chamados que precisam de atenção no dashboard.
+            chamados = [c for c in chamados if getattr(c, 'status', None) in ('Aberto', 'Em andamento', 'Em espera')]
             current_ticket_ids = {c.id for c in chamados}
 
             # Verifica se há novos chamados desde a última atualização
@@ -233,6 +258,13 @@ class DashboardWindow(QMainWindow):
         self.lbl_latest_usuario.setText(ticket.nome_usuario)
         self.lbl_latest_maquina.setText(ticket.maquina or "N/A")
         self.lbl_latest_horario.setText(dt_obj.strftime('%H:%M - %d/%m/%Y') if dt_obj else "")
+        self.lbl_latest_status.setText(ticket.status or "-")
+        status_color = {
+            "Aberto": "#e74c3c",
+            "Em andamento": "#3498db",
+            "Em espera": "#9e9e9e"
+        }.get(ticket.status, "#ecf0f1")
+        self.lbl_latest_status.setStyleSheet(f"color: {status_color}; font-size: 20px; font-weight: bold;")
         self.lbl_latest_descricao.setText(ticket.descricao)
 
     def preencher_tabela(self, chamados):
@@ -274,7 +306,12 @@ class DashboardWindow(QMainWindow):
 
             status_item = items[-1]
             status_item.setFont(QFont("Segoe UI", 16, QFont.Bold))
-            status_color = {"Aberto": "#e74c3c", "Em andamento": "#3498db", "Resolvido": "#f1c40f"}.get(c.status, "#ecf0f1")
+            status_color = {
+                "Aberto": "#e74c3c",
+                "Em andamento": "#3498db",
+                "Em espera": "#9e9e9e",
+                "Resolvido": "#f1c40f"
+            }.get(c.status, "#ecf0f1")
             status_item.setForeground(QColor(status_color))
 
             for col, item in enumerate(items):

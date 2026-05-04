@@ -199,6 +199,7 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         self.solicitacao_id = solicitacao_id
         self.user_suporte = user_suporte
         self.credential_inputs = {}
+        self.reopen_requested = False
         self.setWindowTitle(f"Atendimento Solicitação de Acesso #{solicitacao_id}")
         self.setStyleSheet("background-color: #fdfdfd; color: #333333;")
         self.setup_ui()
@@ -537,7 +538,7 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
         try: 
             self.controller.assumir_solicitacao(self.solicitacao_id, self.user_suporte.id)
             QMessageBox.information(self, "Sucesso", "Solicitação em execução!")
-            self.load_solicitacao()
+            self.solicitar_reabertura()
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def marcar_solicitacao_em_espera(self):
@@ -564,14 +565,11 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
                 login = txt_login.text().strip()
                 senha = txt_senha.text().strip()
                 
-                if not login or not senha:
-                    QMessageBox.warning(self, "Atenção", f"Por favor, preencha login e senha para o sistema '{sistema}'.")
-                    return
-                
-                # Salvar no formato "login|senha"
-                credentials_data[sistema] = f"{login}|{senha}"
+                # Salvar no formato "login|senha" apenas se ambos forem preenchidos
+                if login or senha:
+                    credentials_data[sistema] = f"{login}|{senha}"
             
-            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4)
+            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4) if credentials_data else ""
             self.controller.resolver_de_espera(self.solicitacao_id, self.user_suporte.id, json_data)
             QMessageBox.information(self, "Sucesso", "Solicitação finalizada!")
             self.accept()
@@ -586,19 +584,20 @@ class AccountRequestActionDialog(QDialog, CenterMixin):
                 login = txt_login.text().strip()
                 senha = txt_senha.text().strip()
                 
-                if not login or not senha:
-                    QMessageBox.warning(self, "Atenção", f"Por favor, preencha login e senha para o sistema '{sistema}'.")
-                    return
-                
-                # Salvar no formato "login|senha"
-                credentials_data[sistema] = f"{login}|{senha}"
+                # Salvar no formato "login|senha" apenas se ambos forem preenchidos
+                if login or senha:
+                    credentials_data[sistema] = f"{login}|{senha}"
             
-            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4)
+            json_data = json.dumps(credentials_data, ensure_ascii=False, indent=4) if credentials_data else ""
             self.controller.finalizar_solicitacao(self.solicitacao_id, self.user_suporte.id, json_data)
             QMessageBox.information(self, "Sucesso", "Solicitação finalizada!")
             self.accept()
         except Exception as e:
             QMessageBox.warning(self, "Erro", str(e))
+
+    def solicitar_reabertura(self):
+        self.reopen_requested = True
+        self.accept()
 
 # --- JANELA DE AÇÃO DO SUPORTE ---
 class TicketActionDialog(QDialog, CenterMixin):
@@ -607,6 +606,7 @@ class TicketActionDialog(QDialog, CenterMixin):
         self.controller = controller
         self.chamado_id = chamado_id
         self.user_suporte = user_suporte
+        self.reopen_requested = False
         self.setWindowTitle(f"Atendimento Chamado #{chamado_id}")
         self.setStyleSheet("background-color: #fdfdfd; color: #333333;")
         self.setup_ui()
@@ -614,7 +614,7 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def setup_ui(self):
         c = self.controller.buscar_por_id(self.chamado_id)
-        if c.status == "Em andamento" or c.status == "Em espera": self.setFixedSize(950, 780)
+        if c.status == "Em andamento" or c.status == "Em espera": self.setFixedSize(1020, 800)
         elif c.status == "Aberto": self.setFixedSize(600,500)
         else: self.setFixedSize(600,700)
         self.layout = QVBoxLayout(self)
@@ -697,6 +697,13 @@ class TicketActionDialog(QDialog, CenterMixin):
 
     def build_finish_ui(self, chamado):
         lbl = QLabel(f"<b>Em atendimento desde:</b> {chamado.data_inicio_atendimento}")
+        self.action_layout.addWidget(lbl)
+
+        self.action_layout.addWidget(QLabel("Motivo da espera (opcional):"))
+        self.txt_motivo_espera = QLineEdit()
+        self.txt_motivo_espera.setPlaceholderText("Ex.: aguardando retorno do usuário / fornecedor")
+        self.txt_motivo_espera.setStyleSheet("background-color: white; color: #333;")
+        self.action_layout.addWidget(self.txt_motivo_espera)
         
         # Botão para colocar em espera
         btn_wait = QPushButton("Colocar em Espera")
@@ -766,12 +773,17 @@ class TicketActionDialog(QDialog, CenterMixin):
         try: 
             self.controller.assumir_chamado(self.chamado_id, self.user_suporte.id)
             QMessageBox.information(self, "Sucesso", "Chamado em execução!")
-            self.load_chamado()
+            self.reopen_requested = True
+            self.accept()
         except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def marcar_em_espera(self):
         try:
-            self.controller.marcar_em_espera(self.chamado_id, self.user_suporte.id)
+            motivo_espera = ""
+            if hasattr(self, 'txt_motivo_espera'):
+                motivo_espera = self.txt_motivo_espera.text().strip()
+
+            self.controller.marcar_em_espera(self.chamado_id, self.user_suporte.id, motivo_espera)
             QMessageBox.information(self, "Sucesso", "Chamado marcado como em espera!")
             self.load_chamado()
         except Exception as e:

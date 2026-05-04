@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QIcon, QFont, QColor, QPixmap, QDesktopServices
 from datetime import datetime
 import json
-
+from .dialogs import ImageViewDialog
 # --- USUÁRIO COMUM ---
 class UserWindow(QMainWindow): 
     def __init__(self, user, chamado_controller, auth_controller, solicitacao_controller, logout_callback):
@@ -469,6 +469,12 @@ class UserWindow(QMainWindow):
                         btn_confirm.setFixedSize(220, 42)
                         btn_confirm.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.confirmar_fechamento(cid, ctype))
                         layout.addWidget(btn_confirm)
+                elif c.status == "Em espera":
+                    btn_details = QPushButton("Detalhes")
+                    btn_details.setObjectName("Info")
+                    btn_details.setFixedSize(90, 42)
+                    btn_details.clicked.connect(lambda _, cid=c.id, ctype=c.tipo_item: self.ver_detalhes_chamado(cid, ctype))
+                    layout.addWidget(btn_details)
                 elif c.status == "Finalizado":
                     btn_details = QPushButton("Detalhes")
                     btn_details.setObjectName("Info")
@@ -497,7 +503,13 @@ class UserWindow(QMainWindow):
             
             else:
                 # Passa o caminho da imagem selecionada para o controller
-                self.controller.criar_chamado(self.user.id, descricao, maquina, imagem_path=self.selected_image_path)
+                self.controller.criar_chamado(
+                    self.user.id,
+                    descricao,
+                    maquina,
+                    imagem_path=self.selected_image_path,
+                    setor_origem=self.user.setor,
+                )
                 QMessageBox.information(self, "Sucesso", "Chamado registrado!")
 
             self.txt_desc.clear()
@@ -595,40 +607,14 @@ class UserWindow(QMainWindow):
 
                 # --- MOSTRAR IMAGEM ANEXADA (LIDA DO BANCO) ---
                 if hasattr(item, 'imagem_data') and item.imagem_data:
-                    img_frame = QFrame()
-                    img_frame.setStyleSheet("background-color: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;")
-                    img_layout = QVBoxLayout(img_frame)
-                    
-                    img_title = QLabel("<b>Imagem Anexada:</b>")
-                    img_layout.addWidget(img_title)
-
-                    pixmap = QPixmap()
-                    pixmap.loadFromData(item.imagem_data)
-                    lbl_img = QLabel()
-                    lbl_img.setPixmap(pixmap.scaledToWidth(600, Qt.SmoothTransformation))
-                    lbl_img.setAlignment(Qt.AlignCenter)
-                    img_layout.addWidget(lbl_img)
-                    
-                    btn_save_img = QPushButton("Salvar Imagem...")
-                    btn_save_img.setObjectName("Link")
-
-                    def save_image(data=item.imagem_data, filename=getattr(item, 'imagem_filename', 'imagem.png')):
-                        filePath, _ = QFileDialog.getSaveFileName(dialog, "Salvar Imagem Como...", filename, "Imagens (*.png *.jpg *.jpeg)")
-                        if filePath:
-                            try:
-                                with open(filePath, 'wb') as f:
-                                    f.write(data)
-                                QMessageBox.information(dialog, "Sucesso", "Imagem salva com sucesso!")
-                            except Exception as e:
-                                QMessageBox.warning(dialog, "Erro", f"Não foi possível salvar a imagem: {e}")
-                    
-                    btn_save_img.clicked.connect(save_image)
-                    img_layout.addWidget(btn_save_img, 0, Qt.AlignCenter)
-                    
-                    scroll_layout.addWidget(img_frame)
+                    btn_view_img = QPushButton("🖼️ Ver Imagem Anexada")
+                    btn_view_img.setObjectName("Info")
+                    btn_view_img.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; border-radius: 4px; font-weight: bold;")
+                    btn_view_img.clicked.connect(lambda: ImageViewDialog(item.imagem_data, getattr(item, 'imagem_filename', 'imagem.png'), dialog).exec())
+                    scroll_layout.addWidget(btn_view_img)
                 scroll_layout.addSpacing(15)
                 
-                if hasattr(item, 'diagnostico') and item.diagnostico:
+                if item.status != "Em espera" and hasattr(item, 'diagnostico') and item.diagnostico:
                     scroll_layout.addWidget(QLabel("<b>Diagnóstico:</b>"))
                     lbl_diag = QLabel(item.diagnostico)
                     lbl_diag.setWordWrap(True)
@@ -641,6 +627,15 @@ class UserWindow(QMainWindow):
                     lbl_sol.setWordWrap(True)
                     lbl_sol.setTextInteractionFlags(Qt.TextSelectableByMouse)
                     scroll_layout.addWidget(lbl_sol)
+
+                if item.status == "Em espera":
+                    scroll_layout.addSpacing(15)
+                    scroll_layout.addWidget(QLabel("<b>Motivo da espera:</b>"))
+                    motivo = item.diagnostico if hasattr(item, 'diagnostico') and item.diagnostico else "Chamado em espera. Aguardando retorno do suporte."
+                    lbl_motivo = QLabel(motivo)
+                    lbl_motivo.setWordWrap(True)
+                    lbl_motivo.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffeeba;")
+                    scroll_layout.addWidget(lbl_motivo)
 
             elif item_type == 'solicitacao':
                 scroll_layout.addWidget(QLabel("<b>Sistemas Solicitados:</b>"))
