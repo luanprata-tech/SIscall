@@ -1,5 +1,6 @@
 import hashlib
-from datetime import datetime
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
 from app.models import Usuario
 
 class ChamadoController:
@@ -112,22 +113,83 @@ class ChamadoController:
         fim_str = f"{data_fim} 23:59:59"
         
         dados = self.repo.obter_dados_relatorio(inicio_str, fim_str)
+
+        def _parse_datetime(valor):
+            if not valor:
+                return None
+            if isinstance(valor, datetime):
+                return valor
+            for formato in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+                try:
+                    return datetime.strptime(str(valor), formato)
+                except Exception:
+                    continue
+            return None
         
         # Calcular tempo médio
         total_segundos = 0
-        qtd_fechados = len(dados["tempos"])
+        qtd_atendidos = 0
+        qtd_mais_1_dia = 0
         
-        for inicio, fim in dados["tempos"]:
-            try:
-                t1 = datetime.strptime(inicio, "%Y-%m-%d %H:%M:%S")
-                t2 = datetime.strptime(fim, "%Y-%m-%d %H:%M:%S")
-                total_segundos += (t2 - t1).total_seconds()
-            except:
-                pass # Ignora datas mal formadas
+        status_counts = Counter()
+        department_counts = Counter()
+        weekday_counts = Counter({"Seg": 0, "Ter": 0, "Qua": 0, "Qui": 0, "Sex": 0, "Sab": 0, "Dom": 0})
+        created_by_day = defaultdict(int)
+        resolved_by_day = defaultdict(int)
+        heatmap_weekday_hour = [[0 for _ in range(24)] for _ in range(7)]
+
+        for item in dados.get("chamados_periodo", []):
+            abertura = item[0] if len(item) > 0 else None
+            inicio_atendimento = item[1] if len(item) > 1 else None
+            fechamento = item[2] if len(item) > 2 else None
+            status = item[3] if len(item) > 3 else "Sem status"
+            setor = item[4] if len(item) > 4 else None
+            descricao = item[5] if len(item) > 5 else ""
+
+            t_abertura = _parse_datetime(abertura)
+            t_inicio = _parse_datetime(inicio_atendimento)
+            t_fechamento = _parse_datetime(fechamento)
+
+            status_key = status or "Sem status"
+            status_counts[status_key] += 1
+
+            department_counts[(setor or "N/A")] += 1
+
+            if t_abertura:
+                weekday_idx = t_abertura.weekday()
+                weekday_names = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"]
+                weekday_counts[weekday_names[weekday_idx]] += 1
+                day_key = t_abertura.strftime("%Y-%m-%d")
+                created_by_day[day_key] += 1
+                heatmap_weekday_hour[t_abertura.weekday()][t_abertura.hour] += 1
+
+            if t_abertura and t_inicio:
+                diferenca_atendimento = (t_inicio - t_abertura).total_seconds()
+                if diferenca_atendimento >= 0:
+                    total_segundos += diferenca_atendimento
+                    qtd_atendidos += 1
+
+            if t_abertura and t_fechamento:
+                diferenca_fechamento = (t_fechamento - t_abertura).total_seconds()
+                if diferenca_fechamento > 86400:
+                    qtd_mais_1_dia += 1
+                resolved_by_day[t_fechamento.strftime("%Y-%m-%d")] += 1
+
+        # Série mensal fixa (1..12), independente do filtro superior
+        monthly_year = datetime.now().year
+        monthly_labels = [str(m) for m in range(1, 13)]
+        monthly_created = [0] * 12
+        try:
+            for chamado in self.repo.listar_todos():
+                t_abertura = _parse_datetime(getattr(chamado, "data_abertura", None))
+                if t_abertura and t_abertura.year == monthly_year:
+                    monthly_created[t_abertura.month - 1] += 1
+        except Exception:
+            pass
         
         tempo_medio_str = "N/A"
-        if qtd_fechados > 0:
-            media = total_segundos / qtd_fechados
+        if qtd_atendidos > 0:
+            media = total_segundos / qtd_atendidos
             # Converte segundos para H:M
             horas = int(media // 3600)
             minutos = int((media % 3600) // 60)
@@ -138,5 +200,20 @@ class ChamadoController:
             "top_maquina": dados["maquinas"][0] if dados["maquinas"] else ("Nenhuma", 0),
             "top_suporte": dados["suportes"][0] if dados["suportes"] else ("Nenhum", 0),
             "tempo_medio": tempo_medio_str,
-            "total_periodo": qtd_fechados # ou total geral se quisesse
+            "total_periodo": dados.get("total_periodo", 0),
+            "abertos": dados.get("abertos", 0),
+            "fechados": dados.get("fechados", 0),
+            "tempo_medio_atendimento": tempo_medio_str,
+            "mais_1_dia": qtd_mais_1_dia,
+            "status_counts": dict(status_counts),
+            "department_counts": dict(department_counts),
+            "weekday_counts": dict(weekday_counts),
+            "top_3_suportes": dados["suportes"][:3] if dados["suportes"] else [],
+            "timeline_labels": [],
+            "timeline_created": [],
+            "timeline_resolved": [],
+            "monthly_year": monthly_year,
+            "monthly_labels": monthly_labels,
+            "monthly_created": monthly_created,
+            "heatmap_weekday_hour": heatmap_weekday_hour,
         }

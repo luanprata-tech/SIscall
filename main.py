@@ -34,8 +34,8 @@ try:
     from PySide6.QtCore import QTimer
     from PySide6.QtGui import QIcon
     from app.core.database import DatabaseManager
-    from app.repositories import UsuarioRepository, ChamadoRepository, SolicitacaoContaRepository
-    from app.controllers import AuthController, ChamadoController, SolicitacaoContaController
+    from app.repositories import UsuarioRepository, ChamadoRepository, SolicitacaoContaRepository, IPRepository
+    from app.controllers import AuthController, ChamadoController, SolicitacaoContaController, IPController
     from app.views import LoginWindow, UserWindow, AdminWindow, STYLESHEET
 except ImportError as e:
     print(f"ERRO DE IMPORTAÇÃO: {e}")
@@ -89,10 +89,12 @@ class SistemaChamadosApp:
         user_repo = UsuarioRepository(session_factory)
         chamado_repo = ChamadoRepository(session_factory)
         solicitacao_repo = SolicitacaoContaRepository(session_factory)
+        ip_repo = IPRepository(session_factory)
         
         self.auth_controller = AuthController(user_repo)
         self.chamado_controller = ChamadoController(chamado_repo)
         self.solicitacao_controller = SolicitacaoContaController(solicitacao_repo)
+        self.ip_controller = IPController(ip_repo)
 
         # 3. Janela Atual
         self.current_window = None
@@ -120,7 +122,7 @@ class SistemaChamadosApp:
             print(f">>> Login sucesso: {user.nome} ({user.tipo})")
             if user.tipo == 1:
                 # Admin - Passa todos os controllers diretamente no construtor
-                new_window = AdminWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.logout)
+                new_window = AdminWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.ip_controller, self.logout)
             else:
                 # Comum
                 new_window = UserWindow(user, self.chamado_controller, self.auth_controller, self.solicitacao_controller, self.logout)

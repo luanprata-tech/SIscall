@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QFont, QBrush, QIcon
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from datetime import datetime
+from .common import apply_table_shadow
 
 class HighlightDelegate(QStyledItemDelegate):
     """
@@ -184,7 +185,7 @@ class DashboardWindow(QMainWindow):
 
         # Aplica o delegate customizado para garantir que o destaque funcione
         self.table.setItemDelegate(HighlightDelegate(self.table))
-
+        apply_table_shadow(self.table)
         layout.addWidget(self.table)
 
     def setup_sound(self):

@@ -3,8 +3,9 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 import hashlib
 import os
 import sys
+from datetime import datetime
 from dotenv import load_dotenv
-from app.models import Base, Usuario
+from app.models import Base, Usuario, EnderecoIP
 
 # Carregar variáveis de ambiente do arquivo .env
 # Quando empacotado com PyInstaller, o .env pode ser incluído dentro da pasta gerada
@@ -104,6 +105,7 @@ class DatabaseManager:
         self._ensure_usuario_ativo_column()
         self._ensure_chamado_setor_origem_column()
         self._backfill_chamado_setor_origem()
+        self._ensure_ip_pool()
         self._criar_dados_iniciais()
 
     def _ensure_usuario_ativo_column(self):
@@ -159,6 +161,35 @@ class DatabaseManager:
                 'SET setor_origem = (SELECT setor FROM usuarios WHERE usuarios.id = chamados.usuario_id) '
                 'WHERE setor_origem IS NULL'
             ))
+
+    def _ensure_ip_pool(self):
+        """Garante que a faixa fixa de IPs exista no banco."""
+        inspector = inspect(self.engine)
+        if 'enderecos_ip' not in inspector.get_table_names():
+            return
+
+        session = self.Session()
+        try:
+            existentes = {row[0] for row in session.query(EnderecoIP.ip_address).all()}
+            novos = []
+            agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for final in range(1, 256):
+                ip_texto = f"172.23.6.{final}"
+                if ip_texto not in existentes:
+                    novos.append(EnderecoIP(
+                        ip_address=ip_texto,
+                        status="Livre",
+                        data_modificacao=agora,
+                    ))
+
+            if novos:
+                session.add_all(novos)
+                session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     def _criar_dados_iniciais(self):
         session = self.Session()

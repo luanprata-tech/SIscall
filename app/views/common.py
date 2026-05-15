@@ -1,6 +1,7 @@
 # views/common.py
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QColor
+from PySide6.QtWidgets import QGraphicsDropShadowEffect
 
 # --- ESTILOS GLOBAIS ---
 STYLESHEET = """
@@ -126,3 +127,13 @@ LISTA_SETORES = sorted([
     "GUARITA", "LABAGUA", "LABMICRO", "LABORG", "LABROMO", "LABSOLOS", 
     "LEI", "OUVIDORIA", "PRE-MEDIDOS", "PRESIDENCIA", "PROJUR", "PROTOCOLO"
 ])
+
+# --- FUNÇÃO HELPER PARA APLICAR EFEITO DE RELEVO ---
+def apply_table_shadow(table_widget):
+    """Aplica efeito de sombra/relevo a uma QTableWidget."""
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setColor(QColor(17, 24, 39, 35))
+    shadow.setBlurRadius(12)
+    shadow.setOffset(0, 3)
+    table_widget.setGraphicsEffect(shadow)
+    return table_widget

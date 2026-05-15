@@ -222,6 +222,10 @@ class ChamadoRepository:
             # Filtro base de data (Abertura dentro do range)
             # Como é SQLite string, a comparação lexicográfica funciona YYYY-MM-DD
             filtro_data = Chamado.data_abertura.between(data_inicio, data_fim)
+
+            total_periodo = session.query(func.count(Chamado.id)).filter(filtro_data).scalar() or 0
+            abertos = session.query(func.count(Chamado.id)).filter(filtro_data, Chamado.status == 'Pendente').scalar() or 0
+            fechados = session.query(func.count(Chamado.id)).filter(filtro_data, Chamado.status == 'Finalizado').scalar() or 0
             
             # 1. Setor com mais chamados
             top_setor = session.query(func.coalesce(Chamado.setor_origem, 'N/A'), func.count(Chamado.id).label('total'))\
@@ -243,14 +247,23 @@ class ChamadoRepository:
                 .order_by(desc('total')).all()
 
             # 4. Chamados para calcular tempo médio (buscamos os dados brutos para calcular no Python)
-            chamados_finalizados = session.query(Chamado.data_abertura, Chamado.data_fechamento)\
-                .filter(filtro_data, Chamado.status == 'Finalizado').all()
+            chamados_periodo = session.query(
+                Chamado.data_abertura,
+                Chamado.data_inicio_atendimento,
+                Chamado.data_fechamento,
+                Chamado.status,
+                func.coalesce(Chamado.setor_origem, 'N/A'),
+                Chamado.descricao
+            ).filter(filtro_data).all()
 
             return {
+                "total_periodo": total_periodo,
+                "abertos": abertos,
+                "fechados": fechados,
                 "setores": top_setor,
                 "maquinas": top_maquina,
                 "suportes": top_suporte,
-                "tempos": chamados_finalizados
+                "chamados_periodo": chamados_periodo,
             }
         finally:
             session.close()

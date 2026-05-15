@@ -1,6 +1,9 @@
 # views/admin.py
 import os
 import sys
+import socket
+import getpass
+import platform
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QTableWidget, QTableWidgetItem, 
@@ -10,18 +13,20 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QDate
 from PySide6.QtGui import QIcon, QFont, QColor, QPixmap, QDesktopServices
-from datetime import datetime
-from .common import LISTA_SETORES
+from datetime import datetime, timedelta
+from .common import LISTA_SETORES, apply_table_shadow
 from .dialogs import TicketActionDialog, UserEditDialog, UserRegisterDialog, AccountRequestActionDialog
+from . import reports
 
 # --- ADMIN WINDOW (MAXIMIZADO + RELATÓRIOS + GESTÃO) ---
 class AdminWindow(QMainWindow): 
-    def __init__(self, user, chamado_controller, auth_controller, solicitacao_controller, logout_callback):
+    def __init__(self, user, chamado_controller, auth_controller, solicitacao_controller, ip_controller, logout_callback):
         super().__init__()
         self.user = user
         self.controller = chamado_controller
         self.auth_controller = auth_controller
         self.solicitacao_controller = solicitacao_controller
+        self.ip_controller = ip_controller
         self.logout_callback = logout_callback
         # Definir ícone da janela (usa assets/icon.ico e suporta PyInstaller)
         try:
@@ -42,6 +47,7 @@ class AdminWindow(QMainWindow):
         self.items_per_page = 20
         self.current_page_historico = 1
         self.total_pages_historico = 1
+        self.ip_statuses = ["Livre", "Alocado", "Reservado", "Bloqueado"]
 
         self.setup_ui()
         QTimer.singleShot(100, self.showMaximized) 
@@ -69,7 +75,8 @@ class AdminWindow(QMainWindow):
         self.btn_all = QPushButton("Histórico"); self.btn_all.setObjectName("MenuBtn"); self.btn_all.setIcon(QIcon.fromTheme("x-office-spreadsheet")); self.btn_all.setCheckable(True); self.btn_all.clicked.connect(lambda: self.switch_page(1))
 
         self.btn_reports = QPushButton("Relatórios"); self.btn_reports.setObjectName("MenuBtn"); self.btn_reports.setCheckable(True); self.btn_reports.clicked.connect(lambda: self.switch_page(3))
-        self.btn_config = QPushButton("Configurações"); self.btn_config.setObjectName("MenuBtn"); self.btn_config.setIcon(QIcon.fromTheme("preferences-system")); self.btn_config.setCheckable(True); self.btn_config.clicked.connect(lambda: self.switch_page(4))
+        self.btn_ips = QPushButton("Gestão de IPs"); self.btn_ips.setObjectName("MenuBtn"); self.btn_ips.setCheckable(True); self.btn_ips.clicked.connect(lambda: self.switch_page(4))
+        self.btn_config = QPushButton("Configurações"); self.btn_config.setObjectName("MenuBtn"); self.btn_config.setIcon(QIcon.fromTheme("preferences-system")); self.btn_config.setCheckable(True); self.btn_config.clicked.connect(lambda: self.switch_page(5))
         btn_logout = QPushButton("Sair"); btn_logout.setObjectName("MenuBtn"); btn_logout.setStyleSheet("color: #ff6b6b;"); btn_logout.clicked.connect(self.logout_callback)
 
         sidebar_layout.addWidget(lbl_brand); sidebar_layout.addSpacing(20); sidebar_layout.addWidget(self.btn_work); sidebar_layout.addWidget(self.btn_all)
@@ -92,19 +99,21 @@ class AdminWindow(QMainWindow):
         btn_layout.addWidget(self.lbl_accounts_count)
         sidebar_layout.addWidget(self.btn_accounts)
 
-        sidebar_layout.addWidget(self.btn_reports); sidebar_layout.addWidget(self.btn_config); sidebar_layout.addStretch(); sidebar_layout.addWidget(btn_logout)
+        sidebar_layout.addWidget(self.btn_reports); sidebar_layout.addWidget(self.btn_ips); sidebar_layout.addWidget(self.btn_config); sidebar_layout.addStretch(); sidebar_layout.addWidget(btn_logout)
 
         self.pages = QStackedWidget()
         self.page_work = self.create_table_page("Chamados Pendentes", edit_mode=True)
         self.page_all = self.create_table_page("Histórico Completo", edit_mode=False)
         self.page_accounts = self.create_accounts_table_page()
         self.page_reports = self.create_reports_page() # Será o índice 3 agora
+        self.page_ips = self.create_ips_page()
         self.page_config_widget = self.create_config_page()
 
         self.pages.addWidget(self.page_work['widget'])
         self.pages.addWidget(self.page_all['widget'])
         self.pages.addWidget(self.page_accounts['widget'])
         self.pages.addWidget(self.page_reports)
+        self.pages.addWidget(self.page_ips)
         self.pages.addWidget(self.page_config_widget)
 
         main_layout.addWidget(sidebar)
@@ -122,45 +131,48 @@ class AdminWindow(QMainWindow):
         header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin: 15px 5px;")
         table = QTableWidget()
         table.setAlternatingRowColors(True)
-        cols = [ "Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status", "Ação"]
-        if not edit_mode: cols = [ "Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status", "Ação"]
+        cols = ["Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status", "Ação"]
+        if not edit_mode:
+            cols = ["Setor", "Usuário", "Máquina", "Hora", "Data", "Descrição", "Status", "Ação"]
         table.setColumnCount(len(cols))
         table.setHorizontalHeaderLabels(cols)
-        
+
         table.setColumnWidth(0, 150)
         table.setColumnWidth(1, 150)
         table.setColumnWidth(2, 150)
         table.setColumnWidth(3, 90)
         table.setColumnWidth(4, 90)
-        table.setColumnWidth(6, 150) 
+        table.setColumnWidth(6, 150)
         table.setColumnWidth(7, 220)
         table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
-        
+
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        table.verticalHeader().setVisible(False) 
+        table.verticalHeader().setVisible(False)
         table.verticalHeader().setMinimumSectionSize(70)
         table.verticalHeader().setDefaultSectionSize(70)
         table.setWordWrap(True)
-        layout.addWidget(header); layout.addWidget(table)
-        
+        apply_table_shadow(table)
+        layout.addWidget(header)
+        layout.addWidget(table)
+
         page_elements = {'widget': widget, 'table': table, 'edit_mode': edit_mode}
 
-        if not edit_mode: # Apenas para "Histórico"
+        if not edit_mode:
             pagination_widget = QWidget()
             pagination_layout = QHBoxLayout(pagination_widget)
             btn_prev = QPushButton("<< Anterior")
             lbl_page = QLabel("Página 1 / 1")
             lbl_page.setAlignment(Qt.AlignCenter)
             btn_next = QPushButton("Próximo >>")
-            
+
             pagination_layout.addStretch()
             pagination_layout.addWidget(btn_prev)
             pagination_layout.addWidget(lbl_page)
             pagination_layout.addWidget(btn_next)
             pagination_layout.addStretch()
-            
+
             layout.addWidget(pagination_widget)
-            
+
             page_elements.update({'btn_prev': btn_prev, 'btn_next': btn_next, 'lbl_page': lbl_page})
 
         return page_elements
@@ -170,13 +182,13 @@ class AdminWindow(QMainWindow):
         layout = QVBoxLayout(widget)
         header = QLabel("Solicitações de Acesso Pendentes")
         header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin: 15px 5px;")
-        
+
         table = QTableWidget()
         table.setAlternatingRowColors(True)
         cols = ["Setor", "Usuário", "Sistemas Solicitados", "Hora", "Data", "Status", "Ação"]
         table.setColumnCount(len(cols))
         table.setHorizontalHeaderLabels(cols)
-        
+
         table.setColumnWidth(0, 150)
         table.setColumnWidth(1, 150)
         table.setColumnWidth(3, 90)
@@ -184,60 +196,76 @@ class AdminWindow(QMainWindow):
         table.setColumnWidth(5, 150)
         table.setColumnWidth(6, 220)
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        
 
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        table.verticalHeader().setVisible(False) 
+        table.verticalHeader().setVisible(False)
         table.verticalHeader().setMinimumSectionSize(70)
         table.verticalHeader().setDefaultSectionSize(70)
         table.setWordWrap(True)
-        
-        layout.addWidget(header); layout.addWidget(table)
+
+        layout.addWidget(header)
+        layout.addWidget(table)
         return {'widget': widget, 'table': table}
 
     # --- RELATÓRIOS ---
     def create_reports_page(self):
-        widget = QWidget(); layout = QVBoxLayout(widget); layout.setAlignment(Qt.AlignTop)
-        header = QLabel("Relatórios Gerenciais"); header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin: 15px 5px;")
+        return reports.ReportsPage(self, self.controller)
+
+    def create_ips_page(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+        header = QLabel("Gestão de IPs")
+        header.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin: 15px 5px;")
         layout.addWidget(header)
-        
-        filter_frame = QFrame(); filter_frame.setStyleSheet("background: white; border-radius: 5px; padding: 10px;")
-        fl = QHBoxLayout(filter_frame)
-        self.date_inicio = QDateEdit(); self.date_inicio.setCalendarPopup(True); self.date_inicio.setDate(QDate.currentDate().addDays(-30))
-        self.date_fim = QDateEdit(); self.date_fim.setCalendarPopup(True); self.date_fim.setDate(QDate.currentDate())
-        btn_gerar = QPushButton("Gerar Relatório"); btn_gerar.setFixedSize(150, 36); btn_gerar.clicked.connect(self.gerar_relatorios)
-        btn_gerar.setStyleSheet('background:#2c3e50; color: white;')
-        fl.addWidget(QLabel("De:")); fl.addWidget(self.date_inicio); fl.addWidget(QLabel("Até:")); fl.addWidget(self.date_fim); fl.addWidget(btn_gerar); fl.addStretch()
-        layout.addWidget(filter_frame)
+        filter_layout = QHBoxLayout()
+        self.txt_search_ip = QLineEdit()
+        self.txt_search_ip.setPlaceholderText("Buscar por IP, máquina, usuário, setor ou status...")
+        self.txt_search_ip.textChanged.connect(self.load_ips)
 
-        self.grid_metrics = QGridLayout()
-        self.card_setor = self.create_metric_card("Setor com mais chamados", "-", "0")
-        self.card_maquina = self.create_metric_card("Máquina mais problemática", "-", "0")
-        self.card_suporte = self.create_metric_card("Suporte mais produtivo", "-", "0")
-        self.card_tempo = self.create_metric_card("Tempo médio de resolução", "-", "Horas")
-        self.grid_metrics.addWidget(self.card_setor, 0, 0); self.grid_metrics.addWidget(self.card_maquina, 0, 1); self.grid_metrics.addWidget(self.card_suporte, 1, 0); self.grid_metrics.addWidget(self.card_tempo, 1, 1)
-        layout.addLayout(self.grid_metrics); layout.addStretch()
+        self.combo_filter_ip_status = QComboBox()
+        self.combo_filter_ip_status.addItems(["Todos"] + self.ip_statuses)
+        self.combo_filter_ip_status.currentTextChanged.connect(self.load_ips)
+
+        btn_refresh_ips = QPushButton("Atualizar")
+        btn_refresh_ips.clicked.connect(self.load_ips)
+
+        filter_layout.addWidget(self.txt_search_ip, 1)
+        filter_layout.addWidget(self.combo_filter_ip_status)
+        filter_layout.addWidget(btn_refresh_ips)
+        layout.addLayout(filter_layout)
+
+        self.table_ips = QTableWidget()
+        self.table_ips.setAlternatingRowColors(True)
+        self.table_ips.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_ips.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table_ips.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table_ips.verticalHeader().setVisible(False)
+        self.table_ips.verticalHeader().setMinimumSectionSize(65)
+        self.table_ips.verticalHeader().setDefaultSectionSize(65)
+        self.table_ips.setColumnCount(8)
+        self.table_ips.setHorizontalHeaderLabels([
+            "IP", "Máquina", "Nome da máquina", "Nome do usuário", "Setor", "Status", "Modificado em", "Ações"
+        ])
+        self.table_ips.setColumnWidth(0, 160)
+        self.table_ips.setColumnWidth(1, 220)
+        self.table_ips.setColumnWidth(2, 360)
+        self.table_ips.setColumnWidth(3, 360)
+        self.table_ips.setColumnWidth(4, 300)
+        self.table_ips.setColumnWidth(5, 160)
+        self.table_ips.setColumnWidth(6, 180)
+        self.table_ips.setColumnWidth(7, 120)
+        self.table_ips.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.table_ips.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self.table_ips.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        self.table_ips.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.table_ips.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
+        apply_table_shadow(self.table_ips)
+        layout.addWidget(self.table_ips)
+
+        self.load_ips()
         return widget
-
-    def create_metric_card(self, title, main_value, sub_value):
-        box = QGroupBox(title); l = QVBoxLayout(box)
-        val = QLabel(main_value); val.setObjectName("MetricValue"); val.setAlignment(Qt.AlignCenter)
-        sub = QLabel(sub_value); sub.setObjectName("MetricLabel"); sub.setAlignment(Qt.AlignCenter)
-        l.addWidget(val); l.addWidget(sub); return box
-
-    def update_card(self, box, value, sub):
-        box.findChild(QLabel, "MetricValue").setText(str(value))
-        box.findChild(QLabel, "MetricLabel").setText(str(sub))
-
-    def gerar_relatorios(self):
-        d_ini = self.date_inicio.date().toString("yyyy-MM-dd"); d_fim = self.date_fim.date().toString("yyyy-MM-dd")
-        try:
-            data = self.controller.gerar_relatorio(d_ini, d_fim)
-            self.update_card(self.card_setor, data["top_setor"][0], f"{data['top_setor'][1]} chamados")
-            self.update_card(self.card_maquina, data["top_maquina"][0], f"{data['top_maquina'][1]} problemas")
-            self.update_card(self.card_suporte, data["top_suporte"][0], f"{data['top_suporte'][1]} resolvidos")
-            self.update_card(self.card_tempo, data["tempo_medio"], "Médio")
-        except Exception as e: QMessageBox.warning(self, "Erro", f"Falha ao gerar: {e}")
 
     # --- CONFIG (GESTÃO DE USUÁRIOS) ---
     def create_config_page(self):
@@ -281,7 +309,7 @@ class AdminWindow(QMainWindow):
         self.table_users.verticalHeader().setDefaultSectionSize(70) 
         self.table_users.verticalHeader().setVisible(False)
         self.table_users.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        
+        apply_table_shadow(self.table_users)
         layout.addWidget(self.table_users)
         return widget
 
@@ -291,14 +319,277 @@ class AdminWindow(QMainWindow):
         self.btn_all.setChecked(index == 1)
         self.btn_accounts.setChecked(index == 2)
         self.btn_reports.setChecked(index == 3)
-        self.btn_config.setChecked(index == 4)
+        self.btn_ips.setChecked(index == 4)
+        self.btn_config.setChecked(index == 5)
 
         if index == 1: self.current_page_historico = 1
 
-        if index == 4: self.load_users()
+        if index == 5: self.load_users()
         elif index == 3: pass # Relatórios
+        elif index == 4: self.load_ips()
         elif index == 2: self.refresh_data()
         else: self.refresh_data()
+
+    def load_ips(self):
+        if not hasattr(self, 'ip_controller') or not self.ip_controller:
+            return
+
+        termo = self.txt_search_ip.text().strip() if hasattr(self, 'txt_search_ip') else ""
+        status = self.combo_filter_ip_status.currentText() if hasattr(self, 'combo_filter_ip_status') else "Todos"
+        ips = self.ip_controller.listar_ips(termo, status)
+
+        self.table_ips.setRowCount(len(ips))
+        for i, registro in enumerate(ips):
+            self.table_ips.setItem(i, 0, QTableWidgetItem(registro.ip_address))
+            self.table_ips.setItem(i, 1, QTableWidgetItem(registro.maquina or "-"))
+            self.table_ips.setItem(i, 2, QTableWidgetItem(registro.nome_maquina or "-"))
+            self.table_ips.setItem(i, 3, QTableWidgetItem(registro.nome_usuario or "-"))
+            self.table_ips.setItem(i, 4, QTableWidgetItem(registro.setor or "-"))
+
+            status_item = QTableWidgetItem(registro.status or "Livre")
+            status_item.setTextAlignment(Qt.AlignCenter)
+            self.table_ips.setItem(i, 5, status_item)
+
+            self.table_ips.setItem(i, 6, QTableWidgetItem(registro.data_modificacao or "-"))
+
+            btn_editar = QPushButton("Editar")
+            btn_editar.setFixedSize(78, 35)
+            btn_editar.clicked.connect(lambda _, ip=registro.ip_address: self.abrir_form_ip(ip))
+
+            container = QWidget()
+            row_layout = QHBoxLayout(container)
+            row_layout.setContentsMargins(6, 2, 6, 2)
+            row_layout.setSpacing(6)
+            row_layout.addWidget(btn_editar)
+            self.table_ips.setCellWidget(i, 7, container)
+
+        if ips:
+            self.table_ips.selectRow(0)
+
+    def obter_informacoes_maquina(self):
+        """
+        Coleta as informações da máquina local:
+        - IP local (apenas se estiver no prefixo 172.23.6.x)
+        - Nome da máquina
+        - Nome do usuário
+        
+        Retorna None se o IP não estiver na faixa 172.23.6.x
+        """
+        try:
+            # Pega o nome da máquina
+            nome_maquina = socket.gethostname()
+            
+            # Pega o nome do usuário
+            nome_usuario = getpass.getuser()
+            
+            # Pega o IP local
+            try:
+                # Método mais confiável: conecta a um socket externo sem realmente enviar dados
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip_local = s.getsockname()[0]
+                s.close()
+            except Exception:
+                # Fallback: usar localhost
+                ip_local = socket.gethostbyname(socket.gethostname())
+            
+            # Verifica se o IP está no prefixo 172.23.6.x
+            if not ip_local.startswith("172.23.6."):
+                # IP fora da faixa gerenciada, desconsiderar
+                return None
+            
+            return {
+                'ip': ip_local,
+                'nome_maquina': nome_maquina,
+                'nome_usuario': nome_usuario
+            }
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", f"Não foi possível obter informações da máquina: {e}")
+            return None
+
+    def abrir_form_ip(self, ip_texto=None):
+        if not hasattr(self, 'ip_controller') or not self.ip_controller:
+            return
+
+        ip_inicial = ip_texto
+        if not ip_inicial and hasattr(self, 'table_ips') and self.table_ips.currentRow() >= 0:
+            item = self.table_ips.item(self.table_ips.currentRow(), 0)
+            if item:
+                ip_inicial = item.text()
+        if not ip_inicial:
+            ip_inicial = "172.23.6.1"
+
+        registro = self.ip_controller.buscar_por_ip(ip_inicial)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Alocar/Editar IP")
+        dialog.setFixedSize(1040, 620)
+        form_layout = QVBoxLayout(dialog)
+        form_layout.setSpacing(10)
+
+        form_layout.addWidget(QLabel("<b>IP</b>"))
+        combo_ip = QComboBox()
+        combo_ip.addItems([f"172.23.6.{i}" for i in range(1, 256)])
+        combo_ip.setCurrentText(ip_inicial)
+        combo_ip.setMinimumWidth(900)
+        form_layout.addWidget(combo_ip)
+
+        form_layout.addWidget(QLabel("<b>Máquina</b>"))
+        txt_ip_maquina = QLineEdit()
+        txt_ip_maquina.setPlaceholderText("Ex.: Desktop / Notebook / Servidor")
+        txt_ip_maquina.setMinimumWidth(900)
+        form_layout.addWidget(txt_ip_maquina)
+
+        form_layout.addWidget(QLabel("<b>Nome da máquina</b>"))
+        txt_ip_nome_maquina = QLineEdit()
+        txt_ip_nome_maquina.setPlaceholderText("Ex.: PC-ADMIN-01")
+        txt_ip_nome_maquina.setMinimumWidth(900)
+        form_layout.addWidget(txt_ip_nome_maquina)
+
+        form_layout.addWidget(QLabel("<b>Nome do usuário</b>"))
+        txt_ip_nome_usuario = QLineEdit()
+        txt_ip_nome_usuario.setPlaceholderText("Nome do responsável pelo IP")
+        txt_ip_nome_usuario.setMinimumWidth(900)
+        form_layout.addWidget(txt_ip_nome_usuario)
+
+        # Botão para buscar informações da máquina
+        def preencer_informacoes_maquina():
+            """Busca as informações da máquina local e preenche o formulário"""
+            info = self.obter_informacoes_maquina()
+            if info:
+                # Preenche os campos automaticamente
+                txt_ip_nome_usuario.setText(info['nome_usuario'])
+                txt_ip_nome_maquina.setText(info['nome_maquina'])
+                # Seleciona o IP na lista
+                combo_ip.setCurrentText(info['ip'])
+                QMessageBox.information(self, "Sucesso", "Informações da máquina carregadas com sucesso!")
+            else:
+                QMessageBox.warning(self, "Aviso", "O IP local da máquina não está na faixa 172.23.6.x gerenciada.\nVerifique a configuração de rede.")
+
+        btn_buscar_info = QPushButton("📡 Buscar Informações da Máquina")
+        btn_buscar_info.setMinimumWidth(900)
+        btn_buscar_info.setObjectName("Info")
+        btn_buscar_info.clicked.connect(preencer_informacoes_maquina)
+        form_layout.addWidget(btn_buscar_info)
+        form_layout.addSpacing(10)
+
+        form_layout.addWidget(QLabel("<b>Setor</b>"))
+        combo_ip_setor = QComboBox()
+        combo_ip_setor.addItem("-")
+        combo_ip_setor.addItems(LISTA_SETORES)
+        combo_ip_setor.setMinimumWidth(900)
+        form_layout.addWidget(combo_ip_setor)
+
+        form_layout.addWidget(QLabel("<b>Status</b>"))
+        combo_ip_status = QComboBox()
+        combo_ip_status.addItems(self.ip_statuses)
+        combo_ip_status.setMinimumWidth(900)
+        form_layout.addWidget(combo_ip_status)
+
+        lbl_ip_modificacao = QLabel("<b>Data de modificação:</b> -")
+        form_layout.addWidget(lbl_ip_modificacao)
+
+        if registro:
+            txt_ip_maquina.setText(registro.maquina or "")
+            txt_ip_nome_maquina.setText(registro.nome_maquina or "")
+            txt_ip_nome_usuario.setText(registro.nome_usuario or "")
+            combo_ip_setor.setCurrentText(registro.setor or "-")
+            combo_ip_status.setCurrentText(registro.status or "Livre")
+            lbl_ip_modificacao.setText(f"<b>Data de modificação:</b> {registro.data_modificacao or '-'}")
+
+        def atualizar_form_por_ip():
+            atual = self.ip_controller.buscar_por_ip(combo_ip.currentText())
+            if not atual:
+                txt_ip_maquina.clear()
+                txt_ip_nome_maquina.clear()
+                txt_ip_nome_usuario.clear()
+                combo_ip_setor.setCurrentIndex(0)
+                combo_ip_status.setCurrentIndex(0)
+                lbl_ip_modificacao.setText("<b>Data de modificação:</b> -")
+                return
+            txt_ip_maquina.setText(atual.maquina or "")
+            txt_ip_nome_maquina.setText(atual.nome_maquina or "")
+            txt_ip_nome_usuario.setText(atual.nome_usuario or "")
+            combo_ip_setor.setCurrentText(atual.setor or "-")
+            combo_ip_status.setCurrentText(atual.status or "Livre")
+            lbl_ip_modificacao.setText(f"<b>Data de modificação:</b> {atual.data_modificacao or '-'}")
+
+        combo_ip.currentTextChanged.connect(lambda _: atualizar_form_por_ip())
+
+        btn_row = QHBoxLayout()
+        btn_salvar_ip = QPushButton("Salvar alocação")
+        btn_salvar_ip.setObjectName("SubmitBtn")
+        btn_liberar_ip = QPushButton("Liberar IP")
+        btn_liberar_ip.setObjectName("Danger")
+        btn_fechar = QPushButton("Fechar")
+
+        def salvar_no_dialog():
+            try:
+                setor = combo_ip_setor.currentText()
+                if setor == "-":
+                    setor = ""
+
+                self.ip_controller.salvar_ip(
+                    combo_ip.currentText().strip(),
+                    txt_ip_maquina.text().strip(),
+                    txt_ip_nome_maquina.text().strip(),
+                    txt_ip_nome_usuario.text().strip(),
+                    setor,
+                    combo_ip_status.currentText(),
+                )
+                self.load_ips()
+                atualizar_form_por_ip()
+                QMessageBox.information(self, "Sucesso", "IP atualizado com sucesso!")
+            except Exception as e:
+                QMessageBox.warning(self, "Erro", str(e))
+
+        def liberar_no_dialog():
+            try:
+                self.ip_controller.liberar_ip(combo_ip.currentText().strip())
+                self.load_ips()
+                atualizar_form_por_ip()
+                QMessageBox.information(self, "Sucesso", "IP liberado com sucesso!")
+            except Exception as e:
+                QMessageBox.warning(self, "Erro", str(e))
+
+        btn_salvar_ip.clicked.connect(salvar_no_dialog)
+        btn_liberar_ip.clicked.connect(liberar_no_dialog)
+        btn_fechar.clicked.connect(dialog.close)
+
+        btn_row.addWidget(btn_salvar_ip)
+        btn_row.addWidget(btn_liberar_ip)
+        btn_row.addWidget(btn_fechar)
+        form_layout.addLayout(btn_row)
+        form_layout.addStretch()
+
+        dialog.exec()
+
+    def _ip_selecionado_na_tabela(self):
+        if not hasattr(self, 'table_ips') or self.table_ips.currentRow() < 0:
+            return None
+        item = self.table_ips.item(self.table_ips.currentRow(), 0)
+        return item.text() if item else None
+
+    def _selecionar_linha_por_ip(self, ip_texto):
+        if not hasattr(self, 'table_ips') or not ip_texto:
+            return
+        for row in range(self.table_ips.rowCount()):
+            cell = self.table_ips.item(row, 0)
+            if cell and cell.text() == ip_texto:
+                self.table_ips.selectRow(row)
+                return
+
+    def liberar_ip(self, ip_texto=None):
+        try:
+            ip_alvo = ip_texto or self._ip_selecionado_na_tabela()
+            if not ip_alvo:
+                raise ValueError("Selecione um IP para liberar.")
+            self.ip_controller.liberar_ip(ip_alvo)
+            self.load_ips()
+            self._selecionar_linha_por_ip(ip_alvo)
+            QMessageBox.information(self, "Sucesso", "IP liberado com sucesso!")
+        except Exception as e:
+            QMessageBox.warning(self, "Erro", str(e))
 
     def load_users(self):
         if not hasattr(self, 'auth_controller'): return
