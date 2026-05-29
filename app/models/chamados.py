@@ -21,9 +21,9 @@ class Chamado(Base):
     
     status = Column(String, default="Aberto")
     diagnostico = Column(String, nullable=True)
+    observacao_confirmacao = Column(String, nullable=True)
     
-    # Quando é solicitação de conta, este campo armazena login e senha
-    # Exemplo: "admin.user | senha123456"
+    # Quando é solicitação de conta, este campo armazena a resposta do atendimento
     solucao = Column(String, nullable=True)
 
     usuario = relationship("Usuario", foreign_keys=[usuario_id], back_populates="chamados_abertos")

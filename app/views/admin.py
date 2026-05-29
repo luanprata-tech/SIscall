@@ -895,6 +895,12 @@ class AdminWindow(QMainWindow):
             header_info = f"<h3 style='margin:0; color:#2c3e50;'>Chamado #{chamado.id} - {chamado.maquina}</h3>"
             lbl_header = QLabel(header_info)
             scroll_layout.addWidget(lbl_header)
+            # Mostrar o responsável pelo chamado (se houver)
+            resp = chamado.nome_suporte if hasattr(chamado, 'nome_suporte') and chamado.nome_suporte else 'N/A'
+            lbl_resp = QLabel(f"<b>Responsável:</b> {resp}")
+            lbl_resp.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            lbl_resp.setStyleSheet("color: #2c3e50; margin-top:4px;")
+            scroll_layout.addWidget(lbl_resp)
             scroll_layout.addSpacing(10)
             
             scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Descrição:</b>"))
@@ -957,6 +963,15 @@ class AdminWindow(QMainWindow):
                 lbl_sol.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffc107;")
                 lbl_sol.setTextInteractionFlags(Qt.TextSelectableByMouse)
                 scroll_layout.addWidget(lbl_sol)
+
+            if hasattr(chamado, 'observacao_confirmacao') and chamado.observacao_confirmacao:
+                scroll_layout.addSpacing(15)
+                scroll_layout.addWidget(QLabel("<b style='font-size: 13px; color: #333;'>Observação da confirmação:</b>"))
+                lbl_obs = QLabel(chamado.observacao_confirmacao)
+                lbl_obs.setWordWrap(True)
+                lbl_obs.setStyleSheet("background-color:#eef6ff; padding:10px; border-radius:4px; border:1px solid #cfe3ff;")
+                lbl_obs.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                scroll_layout.addWidget(lbl_obs)
             
             scroll_layout.addStretch()
             scroll.setWidget(scroll_content)

@@ -126,7 +126,7 @@ class ChamadoRepository:
         finally:
             session.close()
 
-    def fechar_chamado(self, chamado_id: int):
+    def fechar_chamado(self, chamado_id: int, observacao_confirmacao: str = ""):
         """Fecha o chamado, chamado pelo usuário."""
         session = self.session_factory()
         try:
@@ -134,6 +134,7 @@ class ChamadoRepository:
             if chamado and chamado.status == 'Resolvido':
                 chamado.status = 'Finalizado'
                 chamado.data_fechamento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                chamado.observacao_confirmacao = observacao_confirmacao.strip() if observacao_confirmacao else None
                 session.commit()
         except:
             session.rollback()

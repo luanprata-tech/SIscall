@@ -35,6 +35,7 @@ CREATE TABLE chamados (
     status VARCHAR DEFAULT 'Aberto',
     diagnostico VARCHAR,
     solucao VARCHAR,
+    observacao_confirmacao VARCHAR,
     
     -- Chaves estrangeiras (relações)
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id),

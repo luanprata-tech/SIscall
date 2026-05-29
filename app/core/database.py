@@ -104,6 +104,7 @@ class DatabaseManager:
         Base.metadata.create_all(self.engine)
         self._ensure_usuario_ativo_column()
         self._ensure_chamado_setor_origem_column()
+        self._ensure_chamado_observacao_confirmacao_column()
         self._backfill_chamado_setor_origem()
         self._ensure_ip_pool()
         self._criar_dados_iniciais()
@@ -144,6 +145,18 @@ class DatabaseManager:
                 conn.execute(text('ALTER TABLE chamados ADD COLUMN setor_origem VARCHAR'))
             else:
                 conn.execute(text('ALTER TABLE chamados ADD COLUMN setor_origem VARCHAR'))
+
+    def _ensure_chamado_observacao_confirmacao_column(self):
+        """Garante que a coluna de observação da confirmação exista na tabela de chamados."""
+        inspector = inspect(self.engine)
+        if 'chamados' not in inspector.get_table_names():
+            return
+        cols = [c['name'] for c in inspector.get_columns('chamados')]
+        if 'observacao_confirmacao' in cols:
+            return
+
+        with self.engine.begin() as conn:
+            conn.execute(text('ALTER TABLE chamados ADD COLUMN observacao_confirmacao VARCHAR'))
 
     def _backfill_chamado_setor_origem(self):
         """Preenche setor_origem dos chamados antigos com o setor atual do usuário de origem."""

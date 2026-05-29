@@ -92,7 +92,7 @@ class SistemaChamadosApp:
         ip_repo = IPRepository(session_factory)
         
         self.auth_controller = AuthController(user_repo)
-        self.chamado_controller = ChamadoController(chamado_repo)
+        self.chamado_controller = ChamadoController(chamado_repo, ip_repo)
         self.solicitacao_controller = SolicitacaoContaController(solicitacao_repo)
         self.ip_controller = IPController(ip_repo)
 

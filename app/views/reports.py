@@ -100,6 +100,15 @@ class PanelFrame(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("PanelFrame")
+        self._set_normal_style()
+
+        self.shadow = QGraphicsDropShadowEffect(self)
+        self.shadow.setColor(QColor(17, 24, 39, 35))
+        self.shadow.setBlurRadius(12)
+        self.shadow.setOffset(0, 3)
+        self.setGraphicsEffect(self.shadow)
+
+    def _set_normal_style(self):
         self.setStyleSheet(
             f"""
             QFrame#PanelFrame {{
@@ -109,6 +118,31 @@ class PanelFrame(QFrame):
             }}
             """
         )
+
+    def _set_hover_style(self):
+        self.setStyleSheet(
+            f"""
+            QFrame#PanelFrame {{
+                background: #ffffff;
+                border: 1px solid {ACCENT_BLUE};
+                border-radius: 12px;
+            }}
+            """
+        )
+
+    def enterEvent(self, event):
+        self._set_hover_style()
+        self.shadow.setColor(QColor(47, 128, 237, 110))
+        self.shadow.setBlurRadius(30)
+        self.shadow.setOffset(0, 9)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._set_normal_style()
+        self.shadow.setColor(QColor(17, 24, 39, 35))
+        self.shadow.setBlurRadius(12)
+        self.shadow.setOffset(0, 3)
+        super().leaveEvent(event)
 
 
 def export_widget_to_pdf(parent, widget):
@@ -141,7 +175,55 @@ def export_widget_to_pdf(parent, widget):
 def _parse_date_text(value: str):
     if not value or value.strip("/ ") == "":
         return None
-    return datetime.strptime(value, "%d/%m/%Y")
+    try:
+        # Verifica se a data é válida
+        parsed_date = datetime.strptime(value, "%d/%m/%Y")
+        return parsed_date
+    except ValueError:
+        # Captura datas inválidas como 31/02, 32/01, etc.
+        raise ValueError(f"Data inválida: {value}")
+
+
+def _is_valid_date_format(value: str) -> bool:
+    """Verifica se a string está no formato dd/mm/aaaa e é uma data válida"""
+    if not value or value.strip("/ ") == "":
+        return False
+    
+    # Remove espaços
+    value = value.strip()
+    
+    # Verifica o padrão básico dd/mm/aaaa
+    parts = value.split('/')
+    if len(parts) != 3:
+        return False
+    
+    try:
+        day, month, year = parts
+        
+        # Verifica se são números
+        if not (day.isdigit() and month.isdigit() and year.isdigit()):
+            return False
+        
+        # Verifica os tamanhos
+        if len(day) != 2 or len(month) != 2 or len(year) != 4:
+            return False
+        
+        day_int = int(day)
+        month_int = int(month)
+        year_int = int(year)
+        
+        # Validação básica de ranges
+        if month_int < 1 or month_int > 12:
+            return False
+        
+        if day_int < 1 or day_int > 31:
+            return False
+        
+        # Tenta fazer o parse para validar completamente
+        datetime.strptime(value, "%d/%m/%Y")
+        return True
+    except (ValueError, IndexError):
+        return False
 
 
 def _format_duration(seconds: float) -> str:
@@ -250,11 +332,13 @@ class ReportsPage(QWidget):
         self.txt_date_inicio.setInputMask("00/00/0000")
         self.txt_date_inicio.setFixedWidth(110)
         self.txt_date_inicio.setPlaceholderText("dd/mm/aaaa")
+        self.txt_date_inicio.editingFinished.connect(self._validate_date_fields)
 
         self.txt_date_fim = QLineEdit()
         self.txt_date_fim.setInputMask("00/00/0000")
         self.txt_date_fim.setFixedWidth(110)
         self.txt_date_fim.setPlaceholderText("dd/mm/aaaa")
+        self.txt_date_fim.editingFinished.connect(self._validate_date_fields)
 
         hoje = datetime.today()
         self.txt_date_inicio.setText((hoje - timedelta(days=30)).strftime("%d/%m/%Y"))
@@ -312,7 +396,7 @@ class ReportsPage(QWidget):
         cards_grid.setVerticalSpacing(10)
 
         self.card_total = _build_card("Total no período", "0")
-        self.card_abertos_fechados = _build_card("Abertos vs fechados", "0 / 0")
+        self.card_ips = _build_card("IPs Livres / Total", "0 / 0")
         self.card_tempo_atendimento = _build_card("Tempo médio de atendimento", "N/A")
         self.card_mais_1_dia = _build_card("Acima de 1 dia", "0")
 
@@ -322,9 +406,9 @@ class ReportsPage(QWidget):
         cards_grid.setColumnStretch(3, 1)
 
         cards_grid.addWidget(self.card_total, 0, 0)
-        cards_grid.addWidget(self.card_abertos_fechados, 0, 1)
+        cards_grid.addWidget(self.card_ips, 0, 3)
         cards_grid.addWidget(self.card_tempo_atendimento, 0, 2)
-        cards_grid.addWidget(self.card_mais_1_dia, 0, 3)
+        cards_grid.addWidget(self.card_mais_1_dia, 0, 1)
         scroll_layout.addWidget(cards_frame)
 
         # 2a linha: segmentação/categorização
@@ -335,7 +419,7 @@ class ReportsPage(QWidget):
         segment_grid.setVerticalSpacing(10)
 
         self.panel_status, self.layout_status = self._build_panel("Por Status")
-        self.panel_department, self.layout_department = self._build_panel("Top 3 Setores com mais chamados")
+        self.panel_department, self.layout_department = self._build_panel("Top Setores")
 
         segment_grid.addWidget(self.panel_status, 0, 0)
         segment_grid.addWidget(self.panel_department, 0, 1)
@@ -367,7 +451,7 @@ class ReportsPage(QWidget):
         support_grid.setVerticalSpacing(10)
 
         self.panel_weekday, self.layout_weekday = self._build_panel("Chamados por Dia da Semana")
-        self.panel_suportes, self.layout_suportes = self._build_panel("Top 3 Suportes")
+        self.panel_suportes, self.layout_suportes = self._build_panel("Top Suportes")
 
         support_grid.addWidget(self.panel_weekday, 0, 0)
         support_grid.addWidget(self.panel_suportes, 0, 1)
@@ -382,6 +466,9 @@ class ReportsPage(QWidget):
 
         # Estado inicial dos gráficos
         self._fill_empty_panels()
+        
+        # Validar campos de data inicialmente
+        self._validate_date_fields()
 
     def _build_panel(self, title: str):
         frame = PanelFrame()
@@ -602,21 +689,112 @@ class ReportsPage(QWidget):
 
     def _read_period(self):
         try:
-            data_inicio = _parse_date_text(self.txt_date_inicio.text().strip())
-            data_fim = _parse_date_text(self.txt_date_fim.text().strip())
-        except Exception:
-            QMessageBox.warning(self, "Data inválida", "Digite as datas no formato dd/mm/aaaa")
+            data_inicio_text = self.txt_date_inicio.text().strip()
+            data_fim_text = self.txt_date_fim.text().strip()
+            
+            # Validar formato das datas
+            if not _is_valid_date_format(data_inicio_text):
+                QMessageBox.warning(self, "Data inválida", "Data inicial: Digite no formato dd/mm/aaaa com uma data válida")
+                return None
+            
+            if not _is_valid_date_format(data_fim_text):
+                QMessageBox.warning(self, "Data inválida", "Data final: Digite no formato dd/mm/aaaa com uma data válida")
+                return None
+            
+            data_inicio = _parse_date_text(data_inicio_text)
+            data_fim = _parse_date_text(data_fim_text)
+        except ValueError as e:
+            QMessageBox.warning(self, "Data inválida", f"{str(e)}")
             return None
-
-        if not data_inicio or not data_fim:
-            QMessageBox.warning(self, "Data inválida", "Preencha as duas datas no formato dd/mm/aaaa")
+        except Exception:
+            QMessageBox.warning(self, "Data inválida", "Erro ao processar as datas")
             return None
 
         if data_inicio > data_fim:
-            QMessageBox.warning(self, "Data inválida", "A data inicial não pode ser maior que a final")
+            QMessageBox.warning(self, "Data inválida", "A data inicial não pode ser maior que a data final")
             return None
 
         return data_inicio, data_fim
+
+    def _validate_date_fields(self):
+        """Valida os campos de data e aplica estilos visuais de erro"""
+        data_inicio_text = self.txt_date_inicio.text().strip()
+        data_fim_text = self.txt_date_fim.text().strip()
+        
+        # Estilos para erro e normal
+        error_style = f"""
+            QLineEdit {{
+                background: white;
+                color: {TEXT_DARK};
+                border: 2px solid #eb5757;
+                border-radius: 8px;
+                padding: 7px 10px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid #eb5757;
+            }}
+        """
+        
+        normal_style = f"""
+            QLineEdit {{
+                background: white;
+                color: {TEXT_DARK};
+                border: 1px solid {CARD_BORDER};
+                border-radius: 8px;
+                padding: 7px 10px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {ACCENT_BLUE};
+            }}
+        """
+        
+        success_style = f"""
+            QLineEdit {{
+                background: white;
+                color: {TEXT_DARK};
+                border: 1px solid #27ae60;
+                border-radius: 8px;
+                padding: 7px 10px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {ACCENT_BLUE};
+            }}
+        """
+        
+        # Validar campo "de"
+        if data_inicio_text and not _is_valid_date_format(data_inicio_text):
+            self.txt_date_inicio.setStyleSheet(error_style)
+        elif data_inicio_text:
+            self.txt_date_inicio.setStyleSheet(success_style)
+        else:
+            self.txt_date_inicio.setStyleSheet(normal_style)
+        
+        # Validar campo "até"
+        if data_fim_text and not _is_valid_date_format(data_fim_text):
+            self.txt_date_fim.setStyleSheet(error_style)
+        elif data_fim_text:
+            self.txt_date_fim.setStyleSheet(success_style)
+        else:
+            self.txt_date_fim.setStyleSheet(normal_style)
+        
+        # Validar ordem das datas
+        if (data_inicio_text and data_fim_text and 
+            _is_valid_date_format(data_inicio_text) and 
+            _is_valid_date_format(data_fim_text)):
+            
+            try:
+                data_inicio = _parse_date_text(data_inicio_text)
+                data_fim = _parse_date_text(data_fim_text)
+                
+                if data_inicio > data_fim:
+                    # Se a ordem está errada, marca ambas como erro
+                    self.txt_date_inicio.setStyleSheet(error_style)
+                    self.txt_date_fim.setStyleSheet(error_style)
+            except Exception:
+                pass
 
     def refresh_reports(self):
         period = self._read_period()
@@ -634,13 +812,14 @@ class ReportsPage(QWidget):
             return
 
         total_periodo = data.get("total_periodo", 0)
-        abertos = data.get("abertos", 0)
-        fechados = data.get("fechados", 0)
+        ips_livres = data.get("ips_livres", 0)
+        ips_nao_livres = data.get("ips_nao_livres", 0)
+        total_ips = ips_livres + ips_nao_livres
         tempo_medio_atendimento = data.get("tempo_medio_atendimento", "N/A")
         acima_1_dia = data.get("mais_1_dia", 0)
 
         self._set_card(self.card_total, total_periodo)
-        self._set_card(self.card_abertos_fechados, f"{abertos} / {fechados}")
+        self._set_card(self.card_ips, f"{ips_livres} / {total_ips}")
         self._set_card(self.card_tempo_atendimento, tempo_medio_atendimento)
         self._set_card(self.card_mais_1_dia, acima_1_dia)
 

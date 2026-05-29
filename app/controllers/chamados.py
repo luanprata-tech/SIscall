@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from app.models import Usuario
 
 class ChamadoController:
-    def __init__(self, repo):
+    def __init__(self, repo, ip_repo=None):
         self.repo = repo
+        self.ip_repo = ip_repo
 
     def criar_chamado(self, usuario_id, descricao, maquina, imagem_path=None, setor_origem=None):
         # Nova regra: permite múltiplos chamados, mas bloqueia enquanto houver
@@ -75,7 +76,7 @@ class ChamadoController:
              raise ValueError("Apenas o suporte responsável pode resolver o chamado.")
         self.repo.finalizar_atendimento(chamado_id, diagnostico, solucao)
     
-    def fechar_chamado_pelo_usuario(self, chamado_id: int, usuario_id: int):
+    def fechar_chamado_pelo_usuario(self, chamado_id: int, usuario_id: int, observacao_confirmacao: str = ""):
         """Usuário confirma a resolução e fecha o chamado."""
         chamado = self.repo.buscar_por_id(chamado_id)
         if not chamado:
@@ -85,7 +86,7 @@ class ChamadoController:
         if chamado.status != 'Resolvido':
             raise ValueError("Este chamado não pode ser fechado pois não foi resolvido pelo suporte.")
         
-        self.repo.fechar_chamado(chamado_id)
+        self.repo.fechar_chamado(chamado_id, observacao_confirmacao=observacao_confirmacao)
 
     def buscar_por_id(self, chamado_id):
         return self.repo.buscar_por_id(chamado_id)
@@ -186,6 +187,19 @@ class ChamadoController:
                     monthly_created[t_abertura.month - 1] += 1
         except Exception:
             pass
+
+        ips_livres = 0
+        ips_nao_livres = 0
+        try:
+            if self.ip_repo:
+                for ip in self.ip_repo.listar_todos():
+                    status = (getattr(ip, "status", "") or "Livre").strip().lower()
+                    if status == "livre":
+                        ips_livres += 1
+                    else:
+                        ips_nao_livres += 1
+        except Exception:
+            pass
         
         tempo_medio_str = "N/A"
         if qtd_atendidos > 0:
@@ -201,8 +215,8 @@ class ChamadoController:
             "top_suporte": dados["suportes"][0] if dados["suportes"] else ("Nenhum", 0),
             "tempo_medio": tempo_medio_str,
             "total_periodo": dados.get("total_periodo", 0),
-            "abertos": dados.get("abertos", 0),
-            "fechados": dados.get("fechados", 0),
+            "ips_livres": ips_livres,
+            "ips_nao_livres": ips_nao_livres,
             "tempo_medio_atendimento": tempo_medio_str,
             "mais_1_dia": qtd_mais_1_dia,
             "status_counts": dict(status_counts),

@@ -546,29 +546,60 @@ class UserWindow(QMainWindow):
             except Exception as e: QMessageBox.warning(self, "Erro", str(e))
 
     def confirmar_fechamento(self, item_id, item_type, dialog=None):
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Confirmar Resolução")
-        msg_box.setText("Você confirma que a solicitação foi atendida? Esta ação fechará o item permanentemente.")
-        msg_box.setIcon(QMessageBox.Question)
-        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg_box.button(QMessageBox.Yes).setText("Sim, confirmo")
-        msg_box.button(QMessageBox.No).setText("Não")
-        msg_box.setDefaultButton(QMessageBox.No)
-        confirm = msg_box.exec()
+        confirm_dialog = QDialog(self)
+        confirm_dialog.setWindowTitle("Confirmar Resolução")
+        confirm_dialog.setFixedSize(520, 320)
+        confirm_dialog.setStyleSheet("background-color: #f0f3f4;")
 
-        if confirm == QMessageBox.Yes:
+        layout = QVBoxLayout(confirm_dialog)
+        layout.addWidget(QLabel("Você confirma que a solicitação foi atendida?"))
+        layout.addWidget(QLabel("Observação (opcional):"))
+
+        txt_observacao = QPlainTextEdit()
+        txt_observacao.setFixedHeight(120)
+        txt_observacao.setStyleSheet(
+            "background-color: white; color: #111827; border: 1px solid #d1d5db; border-radius: 6px; padding: 6px;"
+        )
+        layout.addWidget(txt_observacao)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.setStyleSheet(
+            "background-color: #e5e7eb; color: #111827; padding: 8px 12px; border-radius: 6px;"
+        )
+        btn_confirmar = QPushButton("Sim")
+        btn_confirmar.setObjectName("SubmitBtn")
+        btn_confirmar.setStyleSheet(
+            "background-color: #2E7D32; color: white; padding: 8px 12px; border-radius: 6px; font-weight: 700;"
+        )
+        btn_row.addWidget(btn_cancelar)
+        btn_row.addWidget(btn_confirmar)
+        layout.addLayout(btn_row)
+
+        btn_cancelar.clicked.connect(confirm_dialog.reject)
+
+        def _confirmar():
             try:
                 if item_type == 'chamado':
-                    self.controller.fechar_chamado_pelo_usuario(item_id, self.user.id)
+                    self.controller.fechar_chamado_pelo_usuario(
+                        item_id,
+                        self.user.id,
+                        txt_observacao.toPlainText(),
+                    )
                 elif item_type == 'solicitacao':
                     self.solicitacao_controller.fechar_solicitacao_pelo_usuario(item_id, self.user.id)
-                
+
                 QMessageBox.information(self, "Sucesso", "Item fechado com sucesso!")
+                confirm_dialog.accept()
                 if dialog:
                     dialog.accept()
                 self.load_data()
             except Exception as e:
-                QMessageBox.warning(self, "Erro", str(e))
+                QMessageBox.warning(confirm_dialog, "Erro", str(e))
+
+        btn_confirmar.clicked.connect(_confirmar)
+        confirm_dialog.exec()
 
     def ver_detalhes_chamado(self, item_id, item_type):
         try:
@@ -628,6 +659,15 @@ class UserWindow(QMainWindow):
                     lbl_sol.setTextInteractionFlags(Qt.TextSelectableByMouse)
                     scroll_layout.addWidget(lbl_sol)
 
+                if hasattr(item, 'observacao_confirmacao') and item.observacao_confirmacao:
+                    scroll_layout.addSpacing(15)
+                    scroll_layout.addWidget(QLabel("<b>Observação da confirmação:</b>"))
+                    lbl_obs = QLabel(item.observacao_confirmacao)
+                    lbl_obs.setWordWrap(True)
+                    lbl_obs.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                    lbl_obs.setStyleSheet("background-color:#eef6ff; padding:10px; border-radius:4px; border:1px solid #cfe3ff;")
+                    scroll_layout.addWidget(lbl_obs)
+
                 if item.status == "Em espera":
                     scroll_layout.addSpacing(15)
                     scroll_layout.addWidget(QLabel("<b>Motivo da espera:</b>"))
@@ -660,61 +700,26 @@ class UserWindow(QMainWindow):
 
                 # always build credentials block if data exists; filtering occurs later during iteration
                 if hasattr(item, 'credenciais_criadas') and item.credenciais_criadas:
-                    scroll_layout.addWidget(QLabel("<b>Credenciais:</b>"))
-                    
-                    # Criar scroll para credenciais
-                    cred_scroll = QScrollArea()
-                    cred_scroll.setWidgetResizable(True)
-                    cred_scroll.setStyleSheet("background-color:#e8f4f8; border: 1px solid #add8e6;")
-                    
-                    cred_widget = QWidget()
-                    cred_widget.setStyleSheet("background-color:#e8f4f8;")
-                    cred_layout = QVBoxLayout(cred_widget)
-                    cred_layout.setSpacing(10)
+                    scroll_layout.addWidget(QLabel("<b>Resposta do atendimento:</b>"))
 
+                    resposta_texto = item.credenciais_criadas
                     try:
-                        credenciais_data = json.loads(item.credenciais_criadas)
-                        for sistema, cred in credenciais_data.items():
-                            # skip expresso entry if present
-                            if sistema.strip().upper() == 'EXPRESSO':
-                                continue
-                            # Parsear "login|senha"
-                            if '|' in cred:
-                                login, senha = cred.split('|', 1)
-                            else:
-                                login, senha = cred, "***"
-                            
-                            # Frame para cada sistema
-                            system_frame = QWidget()
-                            system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
-                            system_layout = QVBoxLayout(system_frame)
-                            system_layout.setSpacing(3)
-                            system_layout.setContentsMargins(10, 10, 10, 10)
-                            
-                            # Título do sistema
-                            title = QLabel(f"<b>{sistema}</b>")
-                            system_layout.addWidget(title)
-                            
-                            # Login
-                            login_label = QLabel(f"<b>Login:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{login}</span>")
-                            login_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                            system_layout.addWidget(login_label)
-                            
-                            # Senha
-                            senha_label = QLabel(f"<b>Senha:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{senha}</span>")
-                            senha_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                            system_layout.addWidget(senha_label)
-                            
-                            cred_layout.addWidget(system_frame)
+                        dados_legados = json.loads(item.credenciais_criadas)
+                        if isinstance(dados_legados, dict):
+                            linhas = []
+                            for sistema, cred in dados_legados.items():
+                                if isinstance(cred, str):
+                                    cred = cred.replace('|', ' / ')
+                                linhas.append(f"{sistema}: {cred}")
+                            resposta_texto = '\n'.join(linhas) if linhas else item.credenciais_criadas
                     except (json.JSONDecodeError, TypeError):
-                        cred_label = QLabel(item.credenciais_criadas)
-                        cred_label.setWordWrap(True)
-                        cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                        cred_layout.addWidget(cred_label)
-                    
-                    cred_layout.addStretch()
-                    cred_scroll.setWidget(cred_widget)
-                    scroll_layout.addWidget(cred_scroll)
+                        pass
+
+                    cred_label = QLabel(resposta_texto)
+                    cred_label.setWordWrap(True)
+                    cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                    cred_label.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffc107;")
+                    scroll_layout.addWidget(cred_label)
             
             scroll_layout.addStretch()
             scroll.setWidget(scroll_content)
@@ -781,54 +786,26 @@ class UserWindow(QMainWindow):
 
             # Credenciais, filtrando EXPRESSO
             if hasattr(item, 'credenciais_criadas') and item.credenciais_criadas:
-                scroll_layout.addWidget(QLabel("<b>Credenciais Criadas:</b>"))
-                
-                cred_scroll = QScrollArea()
-                cred_scroll.setWidgetResizable(True)
-                cred_scroll.setStyleSheet("background-color:#e8f4f8; border: 1px solid #add8e6;")
-                
-                cred_widget = QWidget()
-                cred_widget.setStyleSheet("background-color:#e8f4f8;")
-                cred_layout = QVBoxLayout(cred_widget)
-                cred_layout.setSpacing(10)
+                scroll_layout.addWidget(QLabel("<b>Resposta do atendimento:</b>"))
 
+                resposta_texto = item.credenciais_criadas
                 try:
-                    credenciais_data = json.loads(item.credenciais_criadas)
-                    for sistema, cred in credenciais_data.items():
-                        if sistema.strip().upper() == 'EXPRESSO':
-                            continue
-                        if '|' in cred:
-                            login, senha = cred.split('|', 1)
-                        else:
-                            login, senha = cred, "***"
-                        
-                        system_frame = QWidget()
-                        system_frame.setStyleSheet("background-color: white; border: 1px solid #add8e6; border-radius: 4px; padding: 10px;")
-                        system_layout = QVBoxLayout(system_frame)
-                        system_layout.setSpacing(3)
-                        system_layout.setContentsMargins(10, 10, 10, 10)
-                        
-                        title = QLabel(f"<b>{sistema}</b>")
-                        system_layout.addWidget(title)
-                        
-                        login_label = QLabel(f"<b>Login:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{login}</span>")
-                        login_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                        system_layout.addWidget(login_label)
-                        
-                        senha_label = QLabel(f"<b>Senha:</b> <span style='font-family: monospace; background-color: #f9f9f9; padding: 2px 5px;'>{senha}</span>")
-                        senha_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                        system_layout.addWidget(senha_label)
-                        
-                        cred_layout.addWidget(system_frame)
+                    dados_legados = json.loads(item.credenciais_criadas)
+                    if isinstance(dados_legados, dict):
+                        linhas = []
+                        for sistema, cred in dados_legados.items():
+                            if isinstance(cred, str):
+                                cred = cred.replace('|', ' / ')
+                            linhas.append(f"{sistema}: {cred}")
+                        resposta_texto = '\n'.join(linhas) if linhas else item.credenciais_criadas
                 except (json.JSONDecodeError, TypeError):
-                    cred_label = QLabel(item.credenciais_criadas)
-                    cred_label.setWordWrap(True)
-                    cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                    cred_layout.addWidget(cred_label)
-                
-                cred_layout.addStretch()
-                cred_scroll.setWidget(cred_widget)
-                scroll_layout.addWidget(cred_scroll)
+                    pass
+
+                cred_label = QLabel(resposta_texto)
+                cred_label.setWordWrap(True)
+                cred_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                cred_label.setStyleSheet("background-color:#fff3cd; padding:10px; border-radius:4px; border:1px solid #ffc107;")
+                scroll_layout.addWidget(cred_label)
             
             scroll_layout.addStretch()
             scroll.setWidget(scroll_content)
